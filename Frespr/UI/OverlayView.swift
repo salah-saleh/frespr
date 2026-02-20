@@ -34,71 +34,83 @@ struct OverlayView: View {
     var viewModel: OverlayViewModel
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             micIndicator
+                .padding(.top, 2)  // align icon with first line of text
 
-            VStack(alignment: .leading, spacing: 2) {
-                switch viewModel.state {
-                case .error:
-                    Text(viewModel.errorMessage)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .lineLimit(3)
-                case .injected:
-                    Text("Injected")
-                        .font(.system(.body, design: .rounded).weight(.medium))
-                        .foregroundStyle(.primary)
-                default:
-                    if viewModel.displayText.isEmpty {
-                        Text(placeholderText)
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text(viewModel.displayText)
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(viewModel.isFinal ? .primary : .secondary)
-                            .lineLimit(3)
-                            .animation(.easeInOut(duration: 0.1), value: viewModel.displayText)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            contentText
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(backgroundMaterial)
+                .fill(.regularMaterial)
                 .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 4)
         )
     }
 
-    // MARK: - Subviews
+    // MARK: - Content
+
+    @ViewBuilder
+    private var contentText: some View {
+        switch viewModel.state {
+        case .error:
+            Text(viewModel.errorMessage)
+                .font(.system(.body, design: .rounded))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+        case .injected:
+            Text("Injected")
+                .font(.system(.body, design: .rounded).weight(.medium))
+                .foregroundStyle(.green)
+
+        default:
+            if viewModel.displayText.isEmpty {
+                Text(placeholderText)
+                    .font(.system(.body, design: .rounded))
+                    .foregroundStyle(.secondary)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        Text(viewModel.displayText)
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(viewModel.isFinal ? .primary : .secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .id("text")
+                    }
+                    .frame(maxHeight: 160)  // ~6 lines before scrolling kicks in
+                    .onChange(of: viewModel.displayText) { _, _ in
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            proxy.scrollTo("text", anchor: .bottom)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Mic indicator
 
     @ViewBuilder
     private var micIndicator: some View {
         ZStack {
             Circle()
                 .fill(indicatorColor.opacity(0.15))
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
 
             Image(systemName: indicatorIcon)
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(indicatorColor)
                 .symbolEffect(.pulse, isActive: viewModel.state == .recording)
                 .contentTransition(.symbolEffect(.replace))
         }
     }
 
-    // MARK: - Computed properties
-
-    private var backgroundMaterial: some ShapeStyle {
-        switch viewModel.state {
-        case .error: return AnyShapeStyle(.regularMaterial)
-        default: return AnyShapeStyle(.regularMaterial)
-        }
-    }
+    // MARK: - Computed
 
     private var indicatorColor: Color {
         switch viewModel.state {

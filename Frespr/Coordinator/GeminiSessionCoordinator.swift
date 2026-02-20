@@ -172,7 +172,7 @@ final class GeminiSessionCoordinator {
         // final word(s) spoken just before key release are still travelling
         // through the network when we read currentTurnTranscript.
         Task {
-            try? await Task.sleep(nanoseconds: 700_000_000)  // 700ms collection window
+            try? await Task.sleep(nanoseconds: 1_200_000_000)  // 1.2s collection window
             guard self.state == .processing else { return }  // may have already delivered via turnComplete
 
             let partial = self.normalizeTranscription(self.geminiService.currentTurnTranscript)
