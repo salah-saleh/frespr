@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- No Dock icon -->
+	<key>LSUIElement</key>
+	<true/>
+
+	<!-- App metadata -->
+	<key>CFBundleName</key>
+	<string>Frespr</string>
+	<key>CFBundleDisplayName</key>
+	<string>Frespr</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.frespr.app</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleExecutable</key>
+	<string>Frespr</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+
+	<!-- Minimum macOS version -->
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+
+	<!-- Privacy usage descriptions -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Frespr uses the microphone to capture your voice for real-time transcription.</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>Frespr uses Accessibility to detect the hotkey and inject transcribed text into any app.</string>
+	<key>NSInputMonitoringUsageDescription</key>
+	<string>Frespr needs to detect the Right Option key while other apps are focused.</string>
+
+	<!-- No storyboard -->
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+</dict>
+</plist>

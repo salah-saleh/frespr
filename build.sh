@@ -1,0 +1,115 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SRC="$SCRIPT_DIR/Frespr"
+BUILD="$SCRIPT_DIR/build"
+APP="$BUILD/Frespr.app"
+PKG="$SCRIPT_DIR/Frespr.pkg"
+SDK="$(xcrun --show-sdk-path --sdk macosx)"
+TARGET="arm64-apple-macosx14.0"
+
+# Usage: ./build.sh [run|pkg]
+#   run  — compile, build .app, sign, kill any running instance, launch (default)
+#   pkg  — compile, build .app, sign, package as .pkg for distribution
+MODE="${1:-run}"
+
+compile() {
+  echo "==> Compiling Frespr"
+  swiftc \
+    -target "$TARGET" \
+    -sdk "$SDK" \
+    -O \
+    -module-name Frespr \
+    "$SRC/App/Debug.swift" \
+    "$SRC/Storage/AppSettings.swift" \
+    "$SRC/Permissions/PermissionManager.swift" \
+    "$SRC/Gemini/GeminiProtocol.swift" \
+    "$SRC/Gemini/GeminiLiveService.swift" \
+    "$SRC/Audio/AudioCaptureEngine.swift" \
+    "$SRC/TextInjection/TextInjector.swift" \
+    "$SRC/HotKey/GlobalHotKeyMonitor.swift" \
+    "$SRC/MenuBar/MenuBarController.swift" \
+    "$SRC/UI/OverlayView.swift" \
+    "$SRC/UI/OverlayWindow.swift" \
+    "$SRC/UI/SettingsView.swift" \
+    "$SRC/UI/SettingsWindowController.swift" \
+    "$SRC/Coordinator/GeminiSessionCoordinator.swift" \
+    "$SRC/App/AppDelegate.swift" \
+    "$SRC/App/main.swift" \
+    -o "$BUILD/Frespr"
+}
+
+bundle() {
+  echo "==> Building .app bundle"
+  mkdir -p "$APP/Contents/MacOS"
+  mkdir -p "$APP/Contents/Resources"
+  cp "$BUILD/Frespr"   "$APP/Contents/MacOS/Frespr"
+  cp "$SRC/Info.plist" "$APP/Contents/Info.plist"
+  cp "$SRC/Frespr.entitlements" "$APP/Contents/Resources/" 2>/dev/null || true
+
+  echo "==> Ad-hoc signing"
+  codesign --force --deep --sign - "$APP"
+  codesign --verify --deep --strict "$APP" && echo "    OK"
+}
+
+# ── run mode ──────────────────────────────────────────────────────────────────
+if [ "$MODE" = "run" ]; then
+  rm -rf "$BUILD"
+  mkdir -p "$BUILD"
+  compile
+  bundle
+
+  # Kill any existing instance
+  pkill -x Frespr 2>/dev/null || true
+  sleep 0.3
+
+  # Clear the debug log so next tail -f starts fresh
+  > /tmp/frespr_debug.log
+
+  echo ""
+  echo "✓ Launching $APP"
+  echo "  (logs → tail -f /tmp/frespr_debug.log)"
+  open "$APP"
+  exit 0
+fi
+
+# ── pkg mode ──────────────────────────────────────────────────────────────────
+if [ "$MODE" = "pkg" ]; then
+  rm -rf "$BUILD"
+  mkdir -p "$BUILD"
+  compile
+  bundle
+
+  echo "==> Packaging"
+  PAYLOAD="$BUILD/payload"
+  mkdir -p "$PAYLOAD"
+  cp -R "$APP" "$PAYLOAD/"
+
+  SCRIPTS="$BUILD/scripts"
+  mkdir -p "$SCRIPTS"
+  cat > "$SCRIPTS/postinstall" << 'POSTINSTALL'
+#!/bin/bash
+CURRENT_USER=$(stat -f '%Su' /dev/console)
+chown -R "$CURRENT_USER:staff" /Applications/Frespr.app
+xattr -dr com.apple.quarantine /Applications/Frespr.app 2>/dev/null || true
+exit 0
+POSTINSTALL
+  chmod +x "$SCRIPTS/postinstall"
+
+  pkgbuild \
+    --root "$PAYLOAD" \
+    --scripts "$SCRIPTS" \
+    --install-location /Applications \
+    --identifier com.frespr.app \
+    --version 1.0 \
+    "$PKG"
+
+  echo ""
+  echo "✓ Built: $PKG"
+  echo "  open '$PKG'"
+  exit 0
+fi
+
+echo "Usage: $0 [run|pkg]"
+exit 1

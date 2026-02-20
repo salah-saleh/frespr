@@ -1,0 +1,24 @@
+# Build output
+build/
+*.pkg
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Xcode
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+
+# Swift
+.build/
+.swiftpm/
+
+# Logs
+/tmp/frespr_debug.log
