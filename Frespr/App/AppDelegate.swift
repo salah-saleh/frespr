@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlayViewModel = OverlayViewModel()
     private var overlayWindow: OverlayWindow?
     private var hotKeyMonitor: GlobalHotKeyMonitor?
+    private var escapeMonitor: Any?
     private var settingsWC: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -23,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 3. Coordinator callbacks
         coordinator.onStateChange = { [weak self] state in self?.handleStateChange(state) }
         coordinator.onTranscriptUpdate = { [weak self] text, isFinal in self?.handleTranscriptUpdate(text: text, isFinal: isFinal) }
-        coordinator.onError = { [weak self] msg in self?.showError(msg) }
+        coordinator.onError = { [weak self] msg in self?.showErrorToast(msg) }
 
         // 4. Hotkey
         let monitor = GlobalHotKeyMonitor()
@@ -32,10 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.start(mode: AppSettings.shared.hotkeyMode)
         hotKeyMonitor = monitor
 
-        // 5. Permissions
+        // 5. Global Escape key to cancel recording
+        installEscapeMonitor()
+
+        // 6. Permissions
         Task { await PermissionManager.shared.checkAndRequestAll() }
 
-        // 6. Open Settings on first launch if no API key
+        // 7. Open Settings on first launch if no API key
         if AppSettings.shared.geminiAPIKey.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.openSettings()
@@ -51,8 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .idle:
             menuBar.setIcon(.idle)
             overlayViewModel.reset()
-            // Hide immediately so focus returns to target app before text injection runs
-            if settings.showOverlay { overlayWindow?.hide() }
+            // Overlay hiding is deferred to flashInjected/hide calls below
         case .connecting:
             menuBar.setIcon(.recording)
             overlayViewModel.state = .recording
@@ -67,8 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlayViewModel.state = .processing
         case .error(let msg):
             menuBar.setIcon(.idle)
-            overlayWindow?.hide()
-            showError(msg)
+            showErrorToast(msg)
         }
     }
 
@@ -76,8 +78,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if isFinal {
             overlayViewModel.finalText = text
             overlayViewModel.interimText = ""
+            // Flash success, then hide. The coordinator will inject text after cleanup.
+            if AppSettings.shared.showOverlay {
+                overlayWindow?.flashInjected()
+            } else {
+                overlayWindow?.hide()
+            }
         } else {
             overlayViewModel.interimText = text
+        }
+    }
+
+    // MARK: - Escape to cancel
+
+    private func installEscapeMonitor() {
+        escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return }  // 53 = Escape
+            Task { @MainActor [weak self] in
+                self?.coordinator.cancelRecording()
+            }
         }
     }
 
@@ -95,17 +114,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wc.showSettings()
     }
 
-    // MARK: - Error
+    // MARK: - Error Toast
 
-    private func showError(_ message: String) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Frespr Error"
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-        NSApp.setActivationPolicy(.accessory)
+    private func showErrorToast(_ message: String) {
+        menuBar.setIcon(.idle)
+        overlayWindow?.showError(message)
     }
 }

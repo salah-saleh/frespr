@@ -4,12 +4,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     var onClose: (() -> Void)?
 
-    private let apiKeyField   = NSTextField()
-    private let holdRadio     = NSButton(radioButtonWithTitle: "Hold Option ⌥ — push to talk",        target: nil, action: nil)
-    private let toggleRadio   = NSButton(radioButtonWithTitle: "Toggle Option ⌥ — tap to start/stop", target: nil, action: nil)
-    private let overlayToggle = NSButton(checkboxWithTitle: "Show overlay while recording", target: nil, action: nil)
-    private let micRow        = PermissionRowView(label: "Microphone")
-    private let axRow         = PermissionRowView(label: "Accessibility (text injection)")
+    private let apiKeyField    = NSTextField()
+    private let apiKeyStatus   = NSImageView()  // green check or red x
+    private let holdRadio      = NSButton(radioButtonWithTitle: "Hold Right Option ⌥ — push to talk",        target: nil, action: nil)
+    private let toggleRadio    = NSButton(radioButtonWithTitle: "Toggle Right Option ⌥ — tap to start/stop", target: nil, action: nil)
+    private let overlayToggle  = NSButton(checkboxWithTitle: "Show overlay while recording", target: nil, action: nil)
+    private let micRow         = PermissionRowView(label: "Microphone")
+    private let axRow          = PermissionRowView(label: "Accessibility (text injection)")
 
     convenience init() {
         let window = NSWindow(
@@ -76,7 +77,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         apiKeyField.cell?.isScrollable = true
         apiKeyField.target = self
         apiKeyField.action = #selector(apiKeyChanged)
-        stack.addArrangedSubview(row(apiKeyField))
+
+        // API key status icon (check / x) next to field
+        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        apiKeyStatus.image = NSImage(systemSymbolName: "circle", accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg)
+        apiKeyStatus.translatesAutoresizingMaskIntoConstraints = false
+        apiKeyStatus.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        apiKeyStatus.heightAnchor.constraint(equalToConstant: 18).isActive = true
+
+        let keyRow = NSStackView(views: [apiKeyField, apiKeyStatus])
+        keyRow.orientation = .horizontal
+        keyRow.spacing = 8
+        keyRow.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(keyRow))
 
         let linkBtn = NSButton(title: "", target: self, action: #selector(openAIStudio))
         linkBtn.bezelStyle = .inline
@@ -119,10 +133,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         stack.addArrangedSubview(row(micRow))
         stack.addArrangedSubview(row(axRow))
 
+        // ── Version footer ───────────────────────────────────────────
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        let versionLabel = NSTextField(labelWithString: "Frespr \(version) (\(build))")
+        versionLabel.font = .systemFont(ofSize: 10)
+        versionLabel.textColor = .tertiaryLabelColor
+        versionLabel.alignment = .center
+        versionLabel.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(versionLabel, top: 4))
+
         // Bottom padding
         let spacer = NSView()
         spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.heightAnchor.constraint(equalToConstant: p).isActive = true
+        spacer.heightAnchor.constraint(equalToConstant: 8).isActive = true
         stack.addArrangedSubview(spacer)
 
         refreshPermissions()
@@ -160,6 +184,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         holdRadio.state   = s.hotkeyMode == .hold   ? .on : .off
         toggleRadio.state = s.hotkeyMode == .toggle  ? .on : .off
         overlayToggle.state = s.showOverlay ? .on : .off
+        updateAPIKeyStatus(key: s.geminiAPIKey)
+    }
+
+    private func updateAPIKeyStatus(key: String) {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        if key.isEmpty {
+            apiKeyStatus.image = NSImage(systemSymbolName: "circle.dashed",
+                                         accessibilityDescription: nil)?.withSymbolConfiguration(cfg)
+            apiKeyStatus.contentTintColor = .tertiaryLabelColor
+        } else {
+            apiKeyStatus.image = NSImage(systemSymbolName: "checkmark.circle.fill",
+                                         accessibilityDescription: nil)?.withSymbolConfiguration(cfg)
+            apiKeyStatus.contentTintColor = .systemGreen
+        }
     }
 
     private func refreshPermissions() {
@@ -178,7 +216,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Actions
 
-    @objc private func apiKeyChanged() { AppSettings.shared.geminiAPIKey = apiKeyField.stringValue }
+    @objc private func apiKeyChanged() {
+        let key = apiKeyField.stringValue
+        AppSettings.shared.geminiAPIKey = key
+        updateAPIKeyStatus(key: key)
+    }
 
     @objc private func hotkeyChanged(_ sender: NSButton) {
         // Manually enforce mutual exclusivity — radio buttons only auto-deselect
@@ -230,7 +272,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
-        AppSettings.shared.geminiAPIKey = apiKeyField.stringValue
+        let key = apiKeyField.stringValue
+        AppSettings.shared.geminiAPIKey = key
         NSApp.mainMenu = nil
         NSApp.setActivationPolicy(.accessory)
         onClose?()

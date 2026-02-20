@@ -18,6 +18,10 @@ final class GeminiSessionCoordinator {
 
     private var isToggled = false  // For toggle mode
 
+    // Accumulates all final transcript segments delivered by the server's VAD
+    // while the user is still recording. Only injected when the user ends the session.
+    private var accumulatedTranscript = ""
+
     enum SessionState: Equatable {
         case idle
         case connecting
@@ -51,12 +55,35 @@ final class GeminiSessionCoordinator {
             }
         }
 
+        // NOTE: process() in GeminiLiveService is @MainActor and calls this
+        // callback synchronously, so we must NOT wrap in Task { @MainActor }
+        // — that would re-queue and cause a race where stopRecording() runs
+        // before accumulatedTranscript is updated.
         geminiService.onTranscriptUpdate = { [weak self] text, isFinal in
-            Task { @MainActor [weak self] in
-                self?.onTranscriptUpdate?(text, isFinal)
-                if isFinal {
-                    self?.handleFinalTranscript(text)
+            guard let self else { return }
+            if isFinal {
+                // Normalize each segment individually before appending so that
+                // ALL-CAPS turns get fixed without affecting already-correct turns.
+                let normalized = self.normalizeTranscription(text)
+                if !self.accumulatedTranscript.isEmpty {
+                    self.accumulatedTranscript += " "
                 }
+                self.accumulatedTranscript += normalized
+                dbg("segment final (normalized): '\(normalized.prefix(80))' total len=\(self.accumulatedTranscript.count) state=\(self.state)")
+
+                if self.state == .processing {
+                    // User already released the key — deliver now.
+                    self.deliverTranscript()
+                } else {
+                    // Still recording — show full accumulated text as interim.
+                    self.onTranscriptUpdate?(self.accumulatedTranscript, false)
+                }
+            } else {
+                // Interim update — show prior segments + current partial.
+                let display = self.accumulatedTranscript.isEmpty
+                    ? text
+                    : self.accumulatedTranscript + " " + text
+                self.onTranscriptUpdate?(display, false)
             }
         }
 
@@ -74,13 +101,26 @@ final class GeminiSessionCoordinator {
                 guard let self = self else { return }
                 dbg("geminiService.onDisconnected state=\(self.state)")
                 if self.state != .idle {
-                    self.cleanup()
+                    // If we have accumulated text, deliver it before cleaning up.
+                    if self.state == .processing && !self.accumulatedTranscript.isEmpty {
+                        self.deliverTranscript()
+                    } else {
+                        self.cleanup()
+                    }
                 }
             }
         }
     }
 
     // MARK: - Public Interface
+
+    /// Cancels any in-progress recording (e.g. Escape pressed).
+    func cancelRecording() {
+        guard state == .recording || state == .connecting || state == .processing else { return }
+        dbg("cancelRecording")
+        accumulatedTranscript = ""
+        cleanup()
+    }
 
     /// Called when hotkey is pressed (in hold mode) or first press (in toggle mode)
     func startRecording() {
@@ -94,6 +134,14 @@ final class GeminiSessionCoordinator {
             return
         }
 
+        guard PermissionManager.shared.microphoneAuthorized else {
+            let msg = "Microphone access is required. Open Settings to grant permission."
+            state = .error(msg)
+            onError?(msg)
+            return
+        }
+
+        accumulatedTranscript = ""
         dbg("startRecording — connecting")
         state = .connecting
 
@@ -113,14 +161,28 @@ final class GeminiSessionCoordinator {
         guard state == .recording || state == .connecting else { return }
         state = .processing
         audioEngine.stop()
+
+        // Grab whatever partial transcript the current VAD turn has accumulated
+        // in the service layer — this is the text from the final in-flight segment
+        // that may never get a turnComplete (server can take seconds to respond).
         geminiService.sendStreamEnd()
-        // Final transcript will arrive via onTranscriptUpdate(isFinal: true)
-        // Set a timeout in case nothing comes back
+
+        // Wait a short window for the last in-flight audio chunks to arrive
+        // and be transcribed before we snap and deliver. Without this, the
+        // final word(s) spoken just before key release are still travelling
+        // through the network when we read currentTurnTranscript.
         Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)  // 5 second timeout
-            if self.state == .processing {
-                self.cleanup()
+            try? await Task.sleep(nanoseconds: 700_000_000)  // 700ms collection window
+            guard self.state == .processing else { return }  // may have already delivered via turnComplete
+
+            let partial = self.normalizeTranscription(self.geminiService.currentTurnTranscript)
+            if !partial.isEmpty {
+                dbg("stopRecording: snapping partial turn: '\(partial.prefix(80))'")
+                if !self.accumulatedTranscript.isEmpty { self.accumulatedTranscript += " " }
+                self.accumulatedTranscript += partial
             }
+            dbg("stopRecording: delivering after 700ms, total len=\(self.accumulatedTranscript.count)")
+            self.deliverTranscript()
         }
     }
 
@@ -144,20 +206,62 @@ final class GeminiSessionCoordinator {
         }
     }
 
-    private func handleFinalTranscript(_ text: String) {
+    /// Injects the accumulated transcript. Segments are already individually
+    /// normalized when appended, so no full-string normalization needed here.
+    private func deliverTranscript() {
+        let text = accumulatedTranscript.trimmingCharacters(in: .whitespaces)
+        accumulatedTranscript = ""
+
         guard !text.isEmpty else {
             cleanup()
             return
         }
+
+        // Signal final transcript to UI
+        onTranscriptUpdate?(text, true)
+
         // Cleanup first (hides overlay, sets state=idle) so the target app
         // gets focus back, then inject after a brief delay for the OS to
         // restore focus to the previously active text field.
         cleanup()
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms
+            try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms — gives OS time to restore focus
             dbg("injecting: '\(text.prefix(80))'")
             TextInjector.shared.inject(text: text)
         }
+    }
+
+    /// Fixes ALL-CAPS and other formatting artifacts from the native audio model.
+    private func normalizeTranscription(_ text: String) -> String {
+        var result = text.trimmingCharacters(in: .whitespaces)
+
+        // If the entire text (ignoring punctuation) is uppercase, convert to
+        // sentence case. The native audio model in AUDIO mode often returns
+        // ALL CAPS transcriptions.
+        let letters = result.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+        let uppercaseLetters = letters.filter { CharacterSet.uppercaseLetters.contains($0) }
+        if letters.count > 1 && uppercaseLetters.count == letters.count {
+            result = toSentenceCase(result)
+        }
+
+        return result
+    }
+
+    /// Converts "HELLO WORLD. HOW ARE YOU" → "Hello world. How are you"
+    private func toSentenceCase(_ text: String) -> String {
+        let lower = text.lowercased()
+        var chars = Array(lower)
+        var capitalizeNext = true
+        for i in chars.indices {
+            if capitalizeNext && chars[i].isLetter {
+                chars[i] = Character(chars[i].uppercased())
+                capitalizeNext = false
+            }
+            if chars[i] == "." || chars[i] == "!" || chars[i] == "?" {
+                capitalizeNext = true
+            }
+        }
+        return String(chars)
     }
 
     private func cleanup() {

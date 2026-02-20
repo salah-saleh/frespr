@@ -227,7 +227,7 @@ final class GeminiLiveService {
         // Ignore ping (0x9) and pong (0xA) control frames
         if opcode == 0x9 {
             // Send pong
-            var pong = Data([0x8A, 0x00])
+            let pong = Data([0x8A, 0x00])
             Task { [weak self] in try? await self?.rawSend(pong) }
         }
 
@@ -237,6 +237,10 @@ final class GeminiLiveService {
     }
 
     // MARK: - Send
+
+    /// The partial transcript being accumulated in the current VAD turn.
+    /// Exposed so the coordinator can grab it at key-release time.
+    var currentTurnTranscript: String { transcriptAccumulator }
 
     private var audioChunksSent = 0
     func sendAudioChunk(base64: String) {

@@ -79,7 +79,8 @@ extension GeminiSetupMessage {
     static func make(model: String = "models/gemini-2.5-flash-native-audio-preview-12-2025") -> GeminiSetupMessage {
         GeminiSetupMessage(setup: Setup(
             model: model,
-            // Native audio model requires AUDIO modality (TEXT alone causes close 1007)
+            // Native audio model requires AUDIO modality (TEXT alone causes silent rejection).
+            // VAD auto-stopping and text formatting are handled client-side instead.
             generationConfig: Setup.GenerationConfig(responseModalities: ["AUDIO"]),
             inputAudioTranscription: Setup.InputAudioTranscription()
         ))
