@@ -66,12 +66,6 @@ struct OverlayView: View {
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
-        case .injected:
-            Text(viewModel.displayText.isEmpty ? "Done" : viewModel.displayText)
-                .font(.system(.body, design: .rounded))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
         default:
             if viewModel.displayText.isEmpty {
                 Text(placeholderText)
@@ -142,7 +136,7 @@ struct OverlayView: View {
         case .idle:       return "Listening…"
         case .recording:  return "Speak now…"
         case .processing: return "Processing…"
-        case .injected:   return "Injected"
+        case .injected:   return "Done"
         case .error:      return ""
         }
     }

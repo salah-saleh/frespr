@@ -121,11 +121,11 @@ final class GlobalHotKeyMonitor {
                 self.onKeyDown?()
 
             } else if !optionDown && self.isKeyDown {
-                // Key released — only honour it if held long enough
+                // Key released — always reset state, only fire onKeyUp if held long enough
                 let held = self.keyDownTime.map { Date().timeIntervalSince($0) * 1000 } ?? 999
+                self.isKeyDown = false
+                self.keyDownTime = nil
                 if held >= self.minHoldMs {
-                    self.isKeyDown = false
-                    self.keyDownTime = nil
                     dbg("→ key up after \(Int(held))ms, firing onKeyUp")
                     self.onKeyUp?()
                 } else {

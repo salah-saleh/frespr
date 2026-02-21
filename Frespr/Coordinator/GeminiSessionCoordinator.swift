@@ -17,6 +17,7 @@ final class GeminiSessionCoordinator {
     }
 
     private var isToggled = false  // For toggle mode
+    private var keyDownAccepted = false  // For hold mode: true only when startRecording() accepted the key-down
 
     // Accumulates all final transcript segments delivered by the server's VAD
     // while the user is still recording. Only injected when the user ends the session.
@@ -306,6 +307,7 @@ final class GeminiSessionCoordinator {
         geminiService.disconnect()
         state = .idle
         isToggled = false
+        keyDownAccepted = false
     }
 
     // MARK: - Toggle Mode Support
@@ -314,7 +316,12 @@ final class GeminiSessionCoordinator {
         dbg("handleHotkeyPress state=\(state) mode=\(settings.hotkeyMode)")
         switch settings.hotkeyMode {
         case .hold:
-            startRecording()
+            if state == .idle {
+                keyDownAccepted = true
+                startRecording()
+            } else {
+                dbg("→ ignoring key down, already in state \(state)")
+            }
         case .toggle:
             switch state {
             case .idle:
@@ -333,8 +340,13 @@ final class GeminiSessionCoordinator {
     }
 
     func handleHotkeyRelease() {
-        dbg("handleHotkeyRelease state=\(state) mode=\(settings.hotkeyMode)")
+        dbg("handleHotkeyRelease state=\(state) mode=\(settings.hotkeyMode) keyDownAccepted=\(keyDownAccepted)")
         guard settings.hotkeyMode == .hold else { return }
+        guard keyDownAccepted else {
+            dbg("→ ignoring key up, no accepted key down")
+            return
+        }
+        keyDownAccepted = false
         stopRecording()
     }
 }
