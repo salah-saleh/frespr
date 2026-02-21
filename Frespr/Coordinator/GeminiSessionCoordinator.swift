@@ -206,28 +206,65 @@ final class GeminiSessionCoordinator {
         }
     }
 
-    /// Injects the accumulated transcript. Segments are already individually
-    /// normalized when appended, so no full-string normalization needed here.
+    /// Injects the accumulated transcript, optionally post-processing it first.
     private func deliverTranscript() {
-        let text = accumulatedTranscript.trimmingCharacters(in: .whitespaces)
+        let rawText = accumulatedTranscript.trimmingCharacters(in: .whitespaces)
         accumulatedTranscript = ""
 
-        guard !text.isEmpty else {
+        guard !rawText.isEmpty else {
             cleanup()
             return
         }
 
-        // Signal final transcript to UI
-        onTranscriptUpdate?(text, true)
-
-        // Cleanup first (hides overlay, sets state=idle) so the target app
-        // gets focus back, then inject after a brief delay for the OS to
-        // restore focus to the previously active text field.
-        cleanup()
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms — gives OS time to restore focus
-            dbg("injecting: '\(text.prefix(80))'")
-            TextInjector.shared.inject(text: text)
+            // Post-process if configured (may take up to ~2s for the REST call)
+            let finalText = await self.postProcess(rawText)
+
+            // Show final text in overlay
+            self.onTranscriptUpdate?(finalText, true)
+
+            // Cleanup (hides overlay, restores focus to target app), then inject
+            self.cleanup()
+            try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms for OS focus restore
+            dbg("injecting: '\(finalText.prefix(80))'")
+            TextInjector.shared.inject(text: finalText)
+        }
+    }
+
+    /// Applies the configured post-processing mode. Always returns a string —
+    /// falls back to rawText on any error or if mode is .none.
+    private func postProcess(_ rawText: String) async -> String {
+        let mode = settings.postProcessingMode
+        guard mode != .none else { return rawText }
+
+        let systemPrompt: String
+        switch mode {
+        case .none:
+            return rawText
+        case .cleanup, .summarize:
+            guard let prompt = mode.systemPrompt else { return rawText }
+            systemPrompt = prompt
+        case .custom:
+            let custom = settings.customPostProcessingPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !custom.isEmpty else { return rawText }
+            systemPrompt = custom
+        }
+
+        let apiKey = settings.geminiAPIKey
+        guard !apiKey.isEmpty else { return rawText }
+
+        do {
+            dbg("postProcess mode=\(mode.rawValue)")
+            let result = try await GeminiPostProcessor.process(
+                rawText: rawText,
+                systemPrompt: systemPrompt,
+                apiKey: apiKey
+            )
+            dbg("postProcess done: '\(result.prefix(80))'")
+            return result
+        } catch {
+            dbg("postProcess error (using raw): \(error.localizedDescription)")
+            return rawText
         }
     }
 

@@ -5,16 +5,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onClose: (() -> Void)?
 
     private let apiKeyField    = NSTextField()
-    private let apiKeyStatus   = NSImageView()  // green check or red x
+    private let apiKeyStatus   = NSImageView()
     private let holdRadio      = NSButton(radioButtonWithTitle: "Hold Right Option ⌥ — push to talk",        target: nil, action: nil)
     private let toggleRadio    = NSButton(radioButtonWithTitle: "Toggle Right Option ⌥ — tap to start/stop", target: nil, action: nil)
     private let overlayToggle  = NSButton(checkboxWithTitle: "Show overlay while recording", target: nil, action: nil)
-    private let micRow         = PermissionRowView(label: "Microphone")
-    private let axRow          = PermissionRowView(label: "Accessibility (text injection)")
+    private let ppNoneRadio      = NSButton(radioButtonWithTitle: PostProcessingMode.none.displayName,      target: nil, action: nil)
+    private let ppCleanupRadio   = NSButton(radioButtonWithTitle: PostProcessingMode.cleanup.displayName,   target: nil, action: nil)
+    private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
+    private let ppCustomRadio    = NSButton(radioButtonWithTitle: PostProcessingMode.custom.displayName,    target: nil, action: nil)
+    private let ppCustomField    = NSTextField()
+    private let micRow           = PermissionRowView(label: "Microphone")
+    private let axRow            = PermissionRowView(label: "Accessibility (text injection)")
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 430),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 640),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -121,6 +126,32 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         stack.addArrangedSubview(divider())
 
+        // ── Post-processing ──────────────────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Post-processing"), top: 12))
+
+        let ppNote = NSTextField(wrappingLabelWithString: "Optionally refine the transcript with Gemini before injecting. Adds ~1–2 seconds.")
+        ppNote.font = .systemFont(ofSize: 11)
+        ppNote.textColor = .secondaryLabelColor
+        ppNote.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(ppNote))
+
+        for btn in [ppNoneRadio, ppCleanupRadio, ppSummarizeRadio, ppCustomRadio] {
+            btn.target = self; btn.action = #selector(ppModeChanged(_:))
+            stack.addArrangedSubview(row(btn))
+        }
+
+        ppCustomField.placeholderString = "Enter your custom prompt…"
+        ppCustomField.font = .systemFont(ofSize: 12)
+        ppCustomField.bezelStyle = .roundedBezel
+        ppCustomField.cell?.usesSingleLineMode = false
+        ppCustomField.cell?.wraps = true
+        ppCustomField.cell?.isScrollable = false
+        ppCustomField.heightAnchor.constraint(equalToConstant: 56).isActive = true
+        ppCustomField.target = self; ppCustomField.action = #selector(ppCustomPromptChanged)
+        stack.addArrangedSubview(row(ppCustomField))
+
+        stack.addArrangedSubview(divider())
+
         // ── Permissions ──────────────────────────────────────────────
         stack.addArrangedSubview(row(sectionHeader("Permissions"), top: 12))
 
@@ -185,6 +216,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         toggleRadio.state = s.hotkeyMode == .toggle  ? .on : .off
         overlayToggle.state = s.showOverlay ? .on : .off
         updateAPIKeyStatus(key: s.geminiAPIKey)
+        updatePPRadios(mode: s.postProcessingMode)
+        ppCustomField.stringValue = s.customPostProcessingPrompt
+        updatePPCustomFieldVisibility()
+    }
+
+    private func updatePPRadios(mode: PostProcessingMode) {
+        ppNoneRadio.state      = mode == .none      ? .on : .off
+        ppCleanupRadio.state   = mode == .cleanup   ? .on : .off
+        ppSummarizeRadio.state = mode == .summarize ? .on : .off
+        ppCustomRadio.state    = mode == .custom    ? .on : .off
+    }
+
+    private func updatePPCustomFieldVisibility() {
+        ppCustomField.isHidden = AppSettings.shared.postProcessingMode != .custom
     }
 
     private func updateAPIKeyStatus(key: String) {
@@ -232,7 +277,24 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func overlayChanged() { AppSettings.shared.showOverlay = overlayToggle.state == .on }
-    @objc private func openAIStudio()                { NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!) }
+    @objc private func openAIStudio() { NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!) }
+
+    @objc private func ppModeChanged(_ sender: NSButton) {
+        let mode: PostProcessingMode
+        switch sender {
+        case ppNoneRadio:      mode = .none
+        case ppCleanupRadio:   mode = .cleanup
+        case ppSummarizeRadio: mode = .summarize
+        default:               mode = .custom
+        }
+        updatePPRadios(mode: mode)
+        AppSettings.shared.postProcessingMode = mode
+        updatePPCustomFieldVisibility()
+    }
+
+    @objc private func ppCustomPromptChanged() {
+        AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
+    }
 
     // MARK: - Show
 
@@ -272,8 +334,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
-        let key = apiKeyField.stringValue
-        AppSettings.shared.geminiAPIKey = key
+        AppSettings.shared.geminiAPIKey = apiKeyField.stringValue
+        AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
         NSApp.mainMenu = nil
         NSApp.setActivationPolicy(.accessory)
         onClose?()

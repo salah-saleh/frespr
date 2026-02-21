@@ -26,6 +26,7 @@ compile() {
     "$SRC/Permissions/PermissionManager.swift" \
     "$SRC/Gemini/GeminiProtocol.swift" \
     "$SRC/Gemini/GeminiLiveService.swift" \
+    "$SRC/Gemini/GeminiPostProcessor.swift" \
     "$SRC/Audio/AudioCaptureEngine.swift" \
     "$SRC/TextInjection/TextInjector.swift" \
     "$SRC/HotKey/GlobalHotKeyMonitor.swift" \
