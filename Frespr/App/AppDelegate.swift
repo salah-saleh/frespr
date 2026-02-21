@@ -53,8 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch state {
         case .idle:
             menuBar.setIcon(.idle)
-            overlayViewModel.reset()
             overlayWindow?.hideIfIdle()
+            if !(overlayWindow?.hasPendingHide ?? false) {
+                overlayViewModel.reset()
+            }
         case .connecting:
             menuBar.setIcon(.recording)
             overlayViewModel.state = .recording

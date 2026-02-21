@@ -34,21 +34,25 @@ struct OverlayView: View {
     var viewModel: OverlayViewModel
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: isMultiLine ? .top : .center, spacing: 12) {
             micIndicator
-                .padding(.top, 2)  // align icon with first line of text
+                .padding(.top, isMultiLine ? 2 : 0)
 
             contentText
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(.regularMaterial)
-                .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 4)
         )
+        .background(.clear)
+    }
+
+    private var isMultiLine: Bool {
+        !viewModel.displayText.isEmpty
     }
 
     // MARK: - Content
@@ -63,9 +67,10 @@ struct OverlayView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
         case .injected:
-            Text("Injected")
-                .font(.system(.body, design: .rounded).weight(.medium))
-                .foregroundStyle(.green)
+            Text(viewModel.displayText.isEmpty ? "Done" : viewModel.displayText)
+                .font(.system(.body, design: .rounded))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
 
         default:
             if viewModel.displayText.isEmpty {

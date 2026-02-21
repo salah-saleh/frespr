@@ -5,11 +5,12 @@ final class OverlayWindow: NSPanel {
     private var hostingView: NSHostingView<OverlayView>?
     private let viewModel: OverlayViewModel
     private var hideWorkItem: DispatchWorkItem?
+    var hasPendingHide: Bool { hideWorkItem != nil }
     private var sizeObservation: NSKeyValueObservation?
 
-    private static let width: CGFloat = 520
-    private static let minHeight: CGFloat = 64
-    private static let maxHeight: CGFloat = 220
+    private static let width: CGFloat = 420
+    private static let minHeight: CGFloat = 48
+    private static let maxHeight: CGFloat = 240
 
     init(viewModel: OverlayViewModel) {
         self.viewModel = viewModel
@@ -22,7 +23,7 @@ final class OverlayWindow: NSPanel {
 
         super.init(
             contentRect: NSRect(x: x, y: y, width: w, height: h),
-            styleMask: [.nonactivatingPanel, .borderless, .hudWindow],
+            styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
         )
@@ -40,12 +41,15 @@ final class OverlayWindow: NSPanel {
         let hosting = NSHostingView(rootView: OverlayView(viewModel: viewModel))
         hosting.sizingOptions = .intrinsicContentSize
         hosting.frame = NSRect(x: 0, y: 0, width: w, height: h)
+        hosting.wantsLayer = true
+        hosting.layer?.backgroundColor = .clear
+        hosting.layer?.isOpaque = false
         self.contentView = hosting
         hostingView = hosting
 
-        // Resize window whenever SwiftUI content changes height
         sizeObservation = hosting.observe(\.intrinsicContentSize, options: [.new]) { [weak self] view, _ in
-            self?.fitToContent(width: view.intrinsicContentSize.width > 0 ? view.intrinsicContentSize.width : w)
+            let sz = view.intrinsicContentSize
+            self?.fitToContent(width: sz.width > 0 ? sz.width : w)
         }
     }
 
@@ -73,7 +77,7 @@ final class OverlayWindow: NSPanel {
     func flashInjected() {
         viewModel.state = .injected
         show()
-        scheduleHide(after: 1.2)
+        scheduleHide(after: 1.5)
     }
 
     func hide() {
@@ -82,7 +86,6 @@ final class OverlayWindow: NSPanel {
         fadeOut()
     }
 
-    /// Hides immediately only if no auto-hide is already scheduled (e.g. after flashInjected).
     func hideIfIdle() {
         guard hideWorkItem == nil else { return }
         fadeOut()
@@ -100,20 +103,21 @@ final class OverlayWindow: NSPanel {
         self.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
     }
 
-    /// Resize the window to fit SwiftUI's intrinsic content height, clamped to min/max.
     private func fitToContent(width: CGFloat) {
         guard let hosting = hostingView else { return }
         let desired = hosting.fittingSize.height
         let newH = max(OverlayWindow.minHeight, min(OverlayWindow.maxHeight, desired))
         let currentFrame = self.frame
-        // Anchor bottom-left: grow upward
         let newY = currentFrame.minY + currentFrame.height - newH
         let newFrame = NSRect(x: currentFrame.minX, y: newY, width: OverlayWindow.width, height: newH)
         self.setFrame(newFrame, display: true, animate: false)
     }
 
     private func scheduleHide(after delay: TimeInterval) {
-        let work = DispatchWorkItem { [weak self] in self?.fadeOut() }
+        let work = DispatchWorkItem { [weak self] in
+            self?.fadeOut()
+            self?.viewModel.reset()
+        }
         hideWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
