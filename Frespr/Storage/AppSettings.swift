@@ -33,9 +33,15 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.customPostProcessingPrompt) }
     }
 
+    var copyToClipboard: Bool {
+        get { defaults.bool(forKey: Keys.copyToClipboard) }
+        set { defaults.set(newValue, forKey: Keys.copyToClipboard) }
+    }
+
     private init() {
         defaults.register(defaults: [
-            Keys.hotkeyMode: HotkeyMode.hold.rawValue
+            Keys.hotkeyMode: HotkeyMode.hold.rawValue,
+            Keys.copyToClipboard: false
         ])
     }
 
@@ -44,6 +50,7 @@ final class AppSettings {
         static let hotkeyMode                = "hotkeyMode"
         static let postProcessingMode        = "postProcessingMode"
         static let customPostProcessingPrompt = "customPostProcessingPrompt"
+        static let copyToClipboard           = "copyToClipboard"
     }
 }
 

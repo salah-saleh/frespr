@@ -40,11 +40,8 @@ When offline or Gemini is down, fall back to on-device transcription via whisper
 ## 12. Audio Buffering During Connect
 Capture audio immediately on hotkey press while the WebSocket is still connecting. Replay buffered audio once connected so the first word(s) are never lost.
 
-## 13. Waveform / Audio Level Indicator in Overlay
-Animate a real-time audio level bar or waveform in the overlay window so the user has visual feedback that their microphone is picking up sound.
-
-## 14. Usage Stats
+## 13. Usage Stats
 Words dictated today/week/month, time saved estimate, most-used apps. A small "Today" widget in the menu popover.
 
-## 15. iCloud / Keychain Sync
+## 14. iCloud / Keychain Sync
 Store the Gemini API key in the system Keychain (more secure than UserDefaults) and optionally sync API key, post-processing settings, and snippets across Macs via `NSUbiquitousKeyValueStore`.

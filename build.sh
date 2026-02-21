@@ -65,6 +65,10 @@ if [ "$MODE" = "run" ]; then
   pkill -x Frespr 2>/dev/null || true
   sleep 0.3
 
+  # Reset Accessibility TCC entry so macOS re-prompts after re-sign
+  # (ad-hoc signing changes the signature each build, invalidating the old grant)
+  tccutil reset Accessibility com.frespr.app 2>/dev/null || true
+
   # Clear the debug log so next tail -f starts fresh
   > /tmp/frespr_debug.log
 

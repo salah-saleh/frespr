@@ -13,6 +13,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
     private let ppCustomRadio    = NSButton(radioButtonWithTitle: PostProcessingMode.custom.displayName,    target: nil, action: nil)
     private let ppCustomField    = NSTextField()
+    private let clipboardCheck   = NSButton(checkboxWithTitle: "Copy transcript to clipboard", target: nil, action: nil)
     private let micRow           = PermissionRowView(label: "Microphone")
     private let axRow            = PermissionRowView(label: "Accessibility (text injection)")
 
@@ -145,6 +146,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         stack.addArrangedSubview(divider())
 
+        // ── Output ───────────────────────────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Output"), top: 12))
+
+        clipboardCheck.target = self; clipboardCheck.action = #selector(clipboardCheckChanged)
+        stack.addArrangedSubview(row(clipboardCheck))
+
+        stack.addArrangedSubview(divider())
+
         // ── Permissions ──────────────────────────────────────────────
         stack.addArrangedSubview(row(sectionHeader("Permissions"), top: 12))
 
@@ -211,6 +220,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         updatePPRadios(mode: s.postProcessingMode)
         ppCustomField.stringValue = s.customPostProcessingPrompt
         updatePPCustomFieldVisibility()
+        clipboardCheck.state = s.copyToClipboard ? .on : .off
     }
 
     private func updatePPRadios(mode: PostProcessingMode) {
@@ -285,6 +295,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func ppCustomPromptChanged() {
         AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
+    }
+
+    @objc private func clipboardCheckChanged() {
+        AppSettings.shared.copyToClipboard = clipboardCheck.state == .on
     }
 
     // MARK: - Show

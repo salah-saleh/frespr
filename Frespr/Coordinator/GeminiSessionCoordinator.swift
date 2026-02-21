@@ -224,6 +224,13 @@ final class GeminiSessionCoordinator {
             // Show final text in overlay
             self.onTranscriptUpdate?(finalText, true)
 
+            // Copy to clipboard if enabled
+            if self.settings.copyToClipboard {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(finalText, forType: .string)
+            }
+
             // Cleanup (hides overlay, restores focus to target app), then inject
             self.cleanup()
             try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms for OS focus restore

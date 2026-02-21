@@ -67,6 +67,17 @@ struct SettingsView: View {
                 Text("Hotkey")
             }
 
+            // Output
+            Section {
+                Toggle("Copy transcript to clipboard", isOn: Binding(
+                    get: { AppSettings.shared.copyToClipboard },
+                    set: { AppSettings.shared.copyToClipboard = $0 }
+                ))
+            } footer: {
+                Text("After transcribing, the result is also copied to your clipboard.")
+                    .foregroundStyle(.secondary)
+            }
+
             // Permissions
             Section {
                 PermissionRow(
@@ -92,7 +103,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 420)
+        .frame(width: 420, height: 480)
         .task {
             await refreshPermissions()
         }
