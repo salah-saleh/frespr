@@ -11,7 +11,6 @@ struct SettingsView: View {
     @State private var apiKeyVisible = false
 
     @State private var hotkeyMode: HotkeyMode = AppSettings.shared.hotkeyMode
-    @State private var showOverlay: Bool = AppSettings.shared.showOverlay
 
     var body: some View {
         Form {
@@ -66,16 +65,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text("Hotkey")
-            }
-
-            // Overlay
-            Section {
-                Toggle("Show overlay while recording", isOn: $showOverlay)
-                    .onChange(of: showOverlay) { _, new in
-                        AppSettings.shared.showOverlay = new
-                    }
-            } header: {
-                Text("Overlay")
             }
 
             // Permissions

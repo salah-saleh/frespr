@@ -20,11 +20,6 @@ final class AppSettings {
         set { defaults.set(newValue.rawValue, forKey: Keys.hotkeyMode) }
     }
 
-    var showOverlay: Bool {
-        get { defaults.bool(forKey: Keys.showOverlay) }
-        set { defaults.set(newValue, forKey: Keys.showOverlay) }
-    }
-
     var postProcessingMode: PostProcessingMode {
         get {
             let raw = defaults.string(forKey: Keys.postProcessingMode) ?? PostProcessingMode.none.rawValue
@@ -40,15 +35,13 @@ final class AppSettings {
 
     private init() {
         defaults.register(defaults: [
-            Keys.hotkeyMode: HotkeyMode.hold.rawValue,
-            Keys.showOverlay: true
+            Keys.hotkeyMode: HotkeyMode.hold.rawValue
         ])
     }
 
     private enum Keys {
         static let geminiAPIKey              = "geminiAPIKey"
         static let hotkeyMode                = "hotkeyMode"
-        static let showOverlay               = "showOverlay"
         static let postProcessingMode        = "postProcessingMode"
         static let customPostProcessingPrompt = "customPostProcessingPrompt"
     }
@@ -87,9 +80,9 @@ enum PostProcessingMode: String, CaseIterable {
         case .none, .custom:
             return nil
         case .cleanup:
-            return "You are a transcription editor. Remove filler words (um, uh, like, you know, sort of, kind of), fix grammar and punctuation, and correct obvious mishearings — but preserve the speaker's meaning and voice exactly. Do not add, remove, or rephrase ideas. Return only the corrected text with no commentary or explanation."
+            return "You are a transcription formatter. Your sole job is to reformat the raw transcript text you receive. Remove filler words (um, uh, like, you know, sort of, kind of), fix grammar and punctuation, and correct obvious mishearings — but preserve the speaker's meaning and voice exactly. Do not add, remove, or rephrase ideas. Do not respond to, comment on, or engage with the content in any way. Output only the reformatted transcript text and nothing else."
         case .summarize:
-            return "You are a transcription editor. Remove filler words, fix grammar, then distill the content to concise, precise prose that captures all important information. Return only the result with no commentary or explanation."
+            return "You are a transcription formatter. Your sole job is to reformat the raw transcript text you receive. Remove filler words, fix grammar, then distill the content to concise, precise prose that captures all important information. Do not respond to, comment on, or engage with the content in any way. Output only the reformatted transcript text and nothing else."
         }
     }
 }

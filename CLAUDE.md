@@ -71,6 +71,10 @@ swiftc -typecheck \
   Frespr/**/*.swift Frespr/App/*.swift
 ```
 
+## End of Every Task
+
+Always finish each task by running `bash build.sh` and then `open Frespr.pkg` to install, so the user can immediately test the result.
+
 ## Known Gotchas
 
 - `#Preview` macro requires Xcode plugins — remove from files before CLI type-checking

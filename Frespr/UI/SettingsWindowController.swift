@@ -8,7 +8,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let apiKeyStatus   = NSImageView()
     private let holdRadio      = NSButton(radioButtonWithTitle: "Hold Right Option ⌥ — push to talk",        target: nil, action: nil)
     private let toggleRadio    = NSButton(radioButtonWithTitle: "Toggle Right Option ⌥ — tap to start/stop", target: nil, action: nil)
-    private let overlayToggle  = NSButton(checkboxWithTitle: "Show overlay while recording", target: nil, action: nil)
     private let ppNoneRadio      = NSButton(radioButtonWithTitle: PostProcessingMode.none.displayName,      target: nil, action: nil)
     private let ppCleanupRadio   = NSButton(radioButtonWithTitle: PostProcessingMode.cleanup.displayName,   target: nil, action: nil)
     private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
@@ -120,12 +119,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         stack.addArrangedSubview(divider())
 
-        // ── Overlay ──────────────────────────────────────────────────
-        overlayToggle.target = self; overlayToggle.action = #selector(overlayChanged)
-        stack.addArrangedSubview(row(overlayToggle, top: 12))
-
-        stack.addArrangedSubview(divider())
-
         // ── Post-processing ──────────────────────────────────────────
         stack.addArrangedSubview(row(sectionHeader("Post-processing"), top: 12))
 
@@ -214,7 +207,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         apiKeyField.stringValue = s.geminiAPIKey
         holdRadio.state   = s.hotkeyMode == .hold   ? .on : .off
         toggleRadio.state = s.hotkeyMode == .toggle  ? .on : .off
-        overlayToggle.state = s.showOverlay ? .on : .off
         updateAPIKeyStatus(key: s.geminiAPIKey)
         updatePPRadios(mode: s.postProcessingMode)
         ppCustomField.stringValue = s.customPostProcessingPrompt
@@ -276,7 +268,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         AppSettings.shared.hotkeyMode = isHold ? .hold : .toggle
     }
 
-    @objc private func overlayChanged() { AppSettings.shared.showOverlay = overlayToggle.state == .on }
     @objc private func openAIStudio() { NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!) }
 
     @objc private func ppModeChanged(_ sender: NSButton) {

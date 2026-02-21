@@ -316,12 +316,18 @@ final class GeminiSessionCoordinator {
         case .hold:
             startRecording()
         case .toggle:
-            if state == .idle {
+            switch state {
+            case .idle:
                 isToggled = true
                 startRecording()
-            } else if state == .recording || state == .connecting {
+            case .recording, .connecting:
                 isToggled = false
                 stopRecording()
+            case .processing:
+                // Cancel the in-flight processing so the user can start fresh.
+                cancelRecording()
+            case .error:
+                break
             }
         }
     }

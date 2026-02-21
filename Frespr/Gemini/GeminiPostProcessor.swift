@@ -12,8 +12,13 @@ private struct GenerateRequest: Encodable {
         let parts: [Part]
         let role: String
     }
+    struct GenerationConfig: Encodable {
+        let temperature: Double
+        let candidateCount: Int
+    }
     let systemInstruction: SystemInstruction
     let contents: [Content]
+    let generationConfig: GenerationConfig
 }
 
 private struct GenerateResponse: Decodable {
@@ -45,9 +50,11 @@ final class GeminiPostProcessor {
             throw URLError(.badURL)
         }
 
+        let userMessage = "Reformat this transcript:\n<transcript>\n\(rawText)\n</transcript>"
         let body = GenerateRequest(
             systemInstruction: .init(parts: [.init(text: systemPrompt)]),
-            contents: [.init(parts: [.init(text: rawText)], role: "user")]
+            contents: [.init(parts: [.init(text: userMessage)], role: "user")],
+            generationConfig: .init(temperature: 0.0, candidateCount: 1)
         )
 
         var request = URLRequest(url: url, timeoutInterval: 10)

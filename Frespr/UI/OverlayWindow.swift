@@ -82,6 +82,12 @@ final class OverlayWindow: NSPanel {
         fadeOut()
     }
 
+    /// Hides immediately only if no auto-hide is already scheduled (e.g. after flashInjected).
+    func hideIfIdle() {
+        guard hideWorkItem == nil else { return }
+        fadeOut()
+    }
+
     // MARK: - Private
 
     private func reposition() {

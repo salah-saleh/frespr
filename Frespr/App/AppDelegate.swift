@@ -50,21 +50,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - State Handling
 
     private func handleStateChange(_ state: GeminiSessionCoordinator.SessionState) {
-        let settings = AppSettings.shared
         switch state {
         case .idle:
             menuBar.setIcon(.idle)
             overlayViewModel.reset()
-            // Overlay hiding is deferred to flashInjected/hide calls below
+            overlayWindow?.hideIfIdle()
         case .connecting:
             menuBar.setIcon(.recording)
             overlayViewModel.state = .recording
             overlayViewModel.interimText = ""
-            if settings.showOverlay { overlayWindow?.show() }
+            overlayWindow?.show()
         case .recording:
             menuBar.setIcon(.recording)
             overlayViewModel.state = .recording
-            if settings.showOverlay { overlayWindow?.show() }
+            overlayWindow?.show()
         case .processing:
             menuBar.setIcon(.processing)
             overlayViewModel.state = .processing
@@ -79,11 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlayViewModel.finalText = text
             overlayViewModel.interimText = ""
             // Flash success, then hide. The coordinator will inject text after cleanup.
-            if AppSettings.shared.showOverlay {
-                overlayWindow?.flashInjected()
-            } else {
-                overlayWindow?.hide()
-            }
+            overlayWindow?.flashInjected()
         } else {
             overlayViewModel.interimText = text
         }
