@@ -17,6 +17,7 @@ enum AudioCaptureError: Error, LocalizedError {
 
 final class AudioCaptureEngine {
     var onAudioChunk: ((Data) -> Void)?  // Called with 16kHz Int16 PCM chunks
+    var onAudioLevel: ((Float) -> Void)? // Called with normalized RMS 0.0–1.0 per chunk
 
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
@@ -93,7 +94,18 @@ final class AudioCaptureEngine {
             while accumulator.count >= bytesPerChunk {
                 let chunk = accumulator.prefix(bytesPerChunk)
                 accumulator.removeFirst(bytesPerChunk)
-                self.onAudioChunk?(Data(chunk))
+                let chunkData = Data(chunk)
+                self.onAudioChunk?(chunkData)
+                // Compute RMS for silence detection
+                if self.onAudioLevel != nil {
+                    let samples = chunkData.withUnsafeBytes { ptr -> [Int16] in
+                        let buf = ptr.bindMemory(to: Int16.self)
+                        return Array(buf)
+                    }
+                    let sumSq = samples.reduce(0.0) { $0 + Double($1) * Double($1) }
+                    let rms = Float(sqrt(sumSq / Double(samples.count))) / 32768.0
+                    self.onAudioLevel?(rms)
+                }
                 chunksEmitted += 1
             }
             if chunksEmitted > 0 { dbg("audio: emitted \(chunksEmitted) chunk(s)") }

@@ -12,14 +12,6 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.geminiAPIKey) }
     }
 
-    var hotkeyMode: HotkeyMode {
-        get {
-            let raw = defaults.string(forKey: Keys.hotkeyMode) ?? HotkeyMode.hold.rawValue
-            return HotkeyMode(rawValue: raw) ?? .hold
-        }
-        set { defaults.set(newValue.rawValue, forKey: Keys.hotkeyMode) }
-    }
-
     var postProcessingMode: PostProcessingMode {
         get {
             let raw = defaults.string(forKey: Keys.postProcessingMode) ?? PostProcessingMode.none.rawValue
@@ -38,31 +30,31 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.copyToClipboard) }
     }
 
+    var silenceDetectionEnabled: Bool {
+        get { defaults.bool(forKey: Keys.silenceDetectionEnabled) }
+        set { defaults.set(newValue, forKey: Keys.silenceDetectionEnabled) }
+    }
+
+    var silenceTimeoutSeconds: Int {
+        get { defaults.integer(forKey: Keys.silenceTimeoutSeconds) }
+        set { defaults.set(newValue, forKey: Keys.silenceTimeoutSeconds) }
+    }
+
     private init() {
         defaults.register(defaults: [
-            Keys.hotkeyMode: HotkeyMode.hold.rawValue,
-            Keys.copyToClipboard: false
+            Keys.copyToClipboard: false,
+            Keys.silenceDetectionEnabled: true,
+            Keys.silenceTimeoutSeconds: 15
         ])
     }
 
     private enum Keys {
         static let geminiAPIKey              = "geminiAPIKey"
-        static let hotkeyMode                = "hotkeyMode"
         static let postProcessingMode        = "postProcessingMode"
         static let customPostProcessingPrompt = "customPostProcessingPrompt"
         static let copyToClipboard           = "copyToClipboard"
-    }
-}
-
-enum HotkeyMode: String, CaseIterable {
-    case hold   = "hold"
-    case toggle = "toggle"
-
-    var displayName: String {
-        switch self {
-        case .hold:   return "Hold (push-to-talk)"
-        case .toggle: return "Toggle (tap to start/stop)"
-        }
+        static let silenceDetectionEnabled   = "silenceDetectionEnabled"
+        static let silenceTimeoutSeconds     = "silenceTimeoutSeconds"
     }
 }
 

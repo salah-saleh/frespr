@@ -11,21 +11,15 @@ final class GlobalHotKeyMonitor {
     private var retryTimer: Timer?
     private var keyDownTime: Date?
     private var isKeyDown = false
-    private(set) var mode: HotkeyMode = .hold
 
     // Minimum ms the key must be held before a release registers.
     // Prevents the OS's own flagsChanged follow-up event from being
     // treated as a key-up immediately after key-down.
     private let minHoldMs: Double = 150
 
-    func start(mode: HotkeyMode) {
-        self.mode = mode
-        dbg("start() mode=\(mode)")
+    func start() {
+        dbg("start()")
         attemptStart()
-    }
-
-    func updateMode(_ newMode: HotkeyMode) {
-        mode = newMode
     }
 
     private func attemptStart() {

@@ -6,8 +6,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private let apiKeyField    = NSTextField()
     private let apiKeyStatus   = NSImageView()
-    private let holdRadio      = NSButton(radioButtonWithTitle: "Hold Right Option ⌥ — push to talk",        target: nil, action: nil)
-    private let toggleRadio    = NSButton(radioButtonWithTitle: "Toggle Right Option ⌥ — tap to start/stop", target: nil, action: nil)
+    private let silenceCheck     = NSButton(checkboxWithTitle: "Auto-stop after silence", target: nil, action: nil)
+    private let silenceTimeout   = NSTextField()
+    private let silenceTimeoutStepper = NSStepper()
+    private let silenceTimeoutLabel   = NSTextField(labelWithString: "seconds")
     private let ppNoneRadio      = NSButton(radioButtonWithTitle: PostProcessingMode.none.displayName,      target: nil, action: nil)
     private let ppCleanupRadio   = NSButton(radioButtonWithTitle: PostProcessingMode.cleanup.displayName,   target: nil, action: nil)
     private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
@@ -19,7 +21,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 660),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -109,14 +111,32 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         stack.addArrangedSubview(divider())
 
-        // ── Hotkey ───────────────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Hotkey Mode"), top: 12))
+        // ── Silence Detection ────────────────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Silence Detection"), top: 12))
 
-        holdRadio.target = self; holdRadio.action = #selector(hotkeyChanged(_:))
-        stack.addArrangedSubview(row(holdRadio))
+        silenceCheck.target = self; silenceCheck.action = #selector(silenceCheckChanged)
+        stack.addArrangedSubview(row(silenceCheck))
 
-        toggleRadio.target = self; toggleRadio.action = #selector(hotkeyChanged(_:))
-        stack.addArrangedSubview(row(toggleRadio))
+        // "Stop after [15] seconds" row
+        silenceTimeout.bezelStyle = .roundedBezel
+        silenceTimeout.alignment = .center
+        silenceTimeout.font = .systemFont(ofSize: 13)
+        silenceTimeout.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        silenceTimeout.target = self; silenceTimeout.action = #selector(silenceTimeoutChanged)
+
+        silenceTimeoutStepper.minValue = 5; silenceTimeoutStepper.maxValue = 60
+        silenceTimeoutStepper.increment = 1; silenceTimeoutStepper.valueWraps = false
+        silenceTimeoutStepper.target = self; silenceTimeoutStepper.action = #selector(silenceStepperChanged(_:))
+
+        let silenceRow = NSStackView(views: [
+            NSTextField(labelWithString: "Stop after"),
+            silenceTimeout,
+            silenceTimeoutStepper,
+            silenceTimeoutLabel
+        ])
+        silenceRow.orientation = .horizontal
+        silenceRow.spacing = 6
+        stack.addArrangedSubview(row(silenceRow))
 
         stack.addArrangedSubview(divider())
 
@@ -214,13 +234,22 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private func loadValues() {
         let s = AppSettings.shared
         apiKeyField.stringValue = s.geminiAPIKey
-        holdRadio.state   = s.hotkeyMode == .hold   ? .on : .off
-        toggleRadio.state = s.hotkeyMode == .toggle  ? .on : .off
         updateAPIKeyStatus(key: s.geminiAPIKey)
+        silenceCheck.state = s.silenceDetectionEnabled ? .on : .off
+        silenceTimeout.integerValue = s.silenceTimeoutSeconds
+        silenceTimeoutStepper.integerValue = s.silenceTimeoutSeconds
+        updateSilenceRowEnabled()
         updatePPRadios(mode: s.postProcessingMode)
         ppCustomField.stringValue = s.customPostProcessingPrompt
         updatePPCustomFieldVisibility()
         clipboardCheck.state = s.copyToClipboard ? .on : .off
+    }
+
+    private func updateSilenceRowEnabled() {
+        let on = AppSettings.shared.silenceDetectionEnabled
+        silenceTimeout.isEnabled = on
+        silenceTimeoutStepper.isEnabled = on
+        silenceTimeoutLabel.textColor = on ? .labelColor : .disabledControlTextColor
     }
 
     private func updatePPRadios(mode: PostProcessingMode) {
@@ -269,13 +298,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         updateAPIKeyStatus(key: key)
     }
 
-    @objc private func hotkeyChanged(_ sender: NSButton) {
-        // Manually enforce mutual exclusivity — radio buttons only auto-deselect
-        // each other when in the same direct superview, not inside stack subviews.
-        let isHold = sender === holdRadio
-        holdRadio.state   = isHold ? .on : .off
-        toggleRadio.state = isHold ? .off : .on
-        AppSettings.shared.hotkeyMode = isHold ? .hold : .toggle
+    @objc private func silenceCheckChanged() {
+        AppSettings.shared.silenceDetectionEnabled = silenceCheck.state == .on
+        updateSilenceRowEnabled()
+    }
+
+    @objc private func silenceTimeoutChanged() {
+        let v = max(5, min(60, silenceTimeout.integerValue))
+        silenceTimeout.integerValue = v
+        silenceTimeoutStepper.integerValue = v
+        AppSettings.shared.silenceTimeoutSeconds = v
+    }
+
+    @objc private func silenceStepperChanged(_ sender: NSStepper) {
+        silenceTimeout.integerValue = sender.integerValue
+        AppSettings.shared.silenceTimeoutSeconds = sender.integerValue
     }
 
     @objc private func openAIStudio() { NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!) }

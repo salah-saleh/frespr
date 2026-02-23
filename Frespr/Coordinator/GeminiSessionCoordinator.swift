@@ -16,8 +16,9 @@ final class GeminiSessionCoordinator {
         didSet { onStateChange?(state) }
     }
 
-    private var isToggled = false  // For toggle mode
-    private var keyDownAccepted = false  // For hold mode: true only when startRecording() accepted the key-down
+    private var isToggled = false
+    private var silenceChunkCount = 0
+    private let silenceLevelThreshold: Float = 0.01
 
     // Accumulates all final transcript segments delivered by the server's VAD
     // while the user is still recording. Only injected when the user ends the session.
@@ -190,10 +191,28 @@ final class GeminiSessionCoordinator {
     // MARK: - Private
 
     private func startAudioCapture() {
+        silenceChunkCount = 0
+
         audioEngine.onAudioChunk = { [weak self] data in
             let base64 = data.base64EncodedString()
             Task { @MainActor [weak self] in
                 self?.geminiService.sendAudioChunk(base64: base64)
+            }
+        }
+
+        audioEngine.onAudioLevel = { [weak self] rms in
+            guard let self, self.state == .recording else { return }
+            guard AppSettings.shared.silenceDetectionEnabled else { return }
+            if rms < self.silenceLevelThreshold {
+                self.silenceChunkCount += 1
+                let timeoutChunks = AppSettings.shared.silenceTimeoutSeconds * 10
+                if self.silenceChunkCount >= timeoutChunks {
+                    Task { @MainActor [weak self] in
+                        self?.stopRecording()
+                    }
+                }
+            } else {
+                self.silenceChunkCount = 0
             }
         }
 
@@ -314,46 +333,25 @@ final class GeminiSessionCoordinator {
         geminiService.disconnect()
         state = .idle
         isToggled = false
-        keyDownAccepted = false
+        silenceChunkCount = 0
     }
 
-    // MARK: - Toggle Mode Support
+    // MARK: - Hotkey
 
     func handleHotkeyPress() {
-        dbg("handleHotkeyPress state=\(state) mode=\(settings.hotkeyMode)")
-        switch settings.hotkeyMode {
-        case .hold:
-            if state == .idle {
-                keyDownAccepted = true
-                startRecording()
-            } else {
-                dbg("→ ignoring key down, already in state \(state)")
-            }
-        case .toggle:
-            switch state {
-            case .idle:
-                isToggled = true
-                startRecording()
-            case .recording, .connecting:
-                isToggled = false
-                stopRecording()
-            case .processing:
-                // Cancel the in-flight processing so the user can start fresh.
-                cancelRecording()
-            case .error:
-                break
-            }
+        dbg("handleHotkeyPress state=\(state)")
+        switch state {
+        case .idle:
+            isToggled = true
+            startRecording()
+        case .recording, .connecting:
+            isToggled = false
+            stopRecording()
+        case .processing:
+            // Cancel the in-flight processing so the user can start fresh.
+            cancelRecording()
+        case .error:
+            break
         }
-    }
-
-    func handleHotkeyRelease() {
-        dbg("handleHotkeyRelease state=\(state) mode=\(settings.hotkeyMode) keyDownAccepted=\(keyDownAccepted)")
-        guard settings.hotkeyMode == .hold else { return }
-        guard keyDownAccepted else {
-            dbg("→ ignoring key up, no accepted key down")
-            return
-        }
-        keyDownAccepted = false
-        stopRecording()
     }
 }

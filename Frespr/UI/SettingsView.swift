@@ -9,8 +9,8 @@ struct SettingsView: View {
     // that break paste. Syncs to AppSettings on change.
     @State private var apiKey: String = AppSettings.shared.geminiAPIKey
     @State private var apiKeyVisible = false
-
-    @State private var hotkeyMode: HotkeyMode = AppSettings.shared.hotkeyMode
+    @State private var silenceEnabled: Bool = AppSettings.shared.silenceDetectionEnabled
+    @State private var silenceTimeout: Int = AppSettings.shared.silenceTimeoutSeconds
 
     var body: some View {
         Form {
@@ -48,23 +48,28 @@ struct SettingsView: View {
                 }
             }
 
-            // Hotkey Mode
+            // Silence Detection
             Section {
-                Picker("Mode", selection: $hotkeyMode) {
-                    ForEach(HotkeyMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
+                Toggle("Auto-stop after silence", isOn: $silenceEnabled)
+                    .onChange(of: silenceEnabled) { _, new in
+                        AppSettings.shared.silenceDetectionEnabled = new
                     }
-                }
-                .pickerStyle(.radioGroup)
-                .onChange(of: hotkeyMode) { _, new in
-                    AppSettings.shared.hotkeyMode = new
-                }
 
-                Text("Hotkey: Right Option (⌥)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Stop after")
+                    Stepper(value: $silenceTimeout, in: 5...60) {
+                        Text("\(silenceTimeout) seconds")
+                    }
+                    .onChange(of: silenceTimeout) { _, new in
+                        AppSettings.shared.silenceTimeoutSeconds = new
+                    }
+                    .disabled(!silenceEnabled)
+                }
             } header: {
-                Text("Hotkey")
+                Text("Silence Detection")
+            } footer: {
+                Text("Automatically stop recording when no speech is detected.")
+                    .foregroundStyle(.secondary)
             }
 
             // Output
@@ -103,7 +108,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 480)
+        .frame(width: 420, height: 560)
         .task {
             await refreshPermissions()
         }

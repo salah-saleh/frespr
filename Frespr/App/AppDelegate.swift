@@ -29,8 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 4. Hotkey
         let monitor = GlobalHotKeyMonitor()
         monitor.onKeyDown = { Task { @MainActor [weak self] in self?.coordinator.handleHotkeyPress() } }
-        monitor.onKeyUp   = { Task { @MainActor [weak self] in self?.coordinator.handleHotkeyRelease() } }
-        monitor.start(mode: AppSettings.shared.hotkeyMode)
+        monitor.start()
         hotKeyMonitor = monitor
 
         // 5. Global Escape key to cancel recording
