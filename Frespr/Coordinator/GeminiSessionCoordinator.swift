@@ -17,12 +17,17 @@ final class GeminiSessionCoordinator {
     }
 
     private var isToggled = false
+    private var isDelivering = false  // guards against double-delivery
     private var silenceChunkCount = 0
     private let silenceLevelThreshold: Float = 0.01
 
     // Accumulates all final transcript segments delivered by the server's VAD
     // while the user is still recording. Only injected when the user ends the session.
     private var accumulatedTranscript = ""
+
+    // Audio chunks captured while still connecting (before setupComplete).
+    // Flushed to Gemini once the session is ready.
+    private var connectBuffer: [String] = []
 
     enum SessionState: Equatable {
         case idle
@@ -53,7 +58,15 @@ final class GeminiSessionCoordinator {
         geminiService.onSetupComplete = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self = self, self.state == .connecting else { return }
-                self.startAudioCapture()
+                self.state = .recording
+                // Flush any audio buffered during the connection handshake.
+                if !self.connectBuffer.isEmpty {
+                    dbg("flushing \(self.connectBuffer.count) pre-connect audio chunks")
+                    for base64 in self.connectBuffer {
+                        self.geminiService.sendAudioChunk(base64: base64)
+                    }
+                    self.connectBuffer.removeAll()
+                }
             }
         }
 
@@ -144,8 +157,10 @@ final class GeminiSessionCoordinator {
         }
 
         accumulatedTranscript = ""
-        dbg("startRecording — connecting")
+        connectBuffer.removeAll()
+        dbg("startRecording — starting audio capture immediately, then connecting")
         state = .connecting
+        startAudioCapture()
 
         Task {
             do {
@@ -196,7 +211,13 @@ final class GeminiSessionCoordinator {
         audioEngine.onAudioChunk = { [weak self] data in
             let base64 = data.base64EncodedString()
             Task { @MainActor [weak self] in
-                self?.geminiService.sendAudioChunk(base64: base64)
+                guard let self else { return }
+                if self.state == .connecting {
+                    // Not yet connected — buffer for later flush.
+                    self.connectBuffer.append(base64)
+                } else {
+                    self.geminiService.sendAudioChunk(base64: base64)
+                }
             }
         }
 
@@ -218,7 +239,7 @@ final class GeminiSessionCoordinator {
 
         do {
             try audioEngine.start()
-            state = .recording
+            // State stays .connecting until setupComplete is received.
         } catch {
             state = .error(error.localizedDescription)
             onError?(error.localizedDescription)
@@ -228,6 +249,9 @@ final class GeminiSessionCoordinator {
 
     /// Injects the accumulated transcript, optionally post-processing it first.
     private func deliverTranscript() {
+        guard !isDelivering else { return }
+        isDelivering = true
+
         let rawText = accumulatedTranscript.trimmingCharacters(in: .whitespaces)
         accumulatedTranscript = ""
 
@@ -239,6 +263,9 @@ final class GeminiSessionCoordinator {
         Task { @MainActor in
             // Post-process if configured (may take up to ~2s for the REST call)
             let finalText = await self.postProcess(rawText)
+
+            // Save to history log
+            TranscriptionLog.shared.add(text: finalText)
 
             // Show final text in overlay
             self.onTranscriptUpdate?(finalText, true)
@@ -333,7 +360,9 @@ final class GeminiSessionCoordinator {
         geminiService.disconnect()
         state = .idle
         isToggled = false
+        isDelivering = false
         silenceChunkCount = 0
+        connectBuffer.removeAll()
     }
 
     // MARK: - Hotkey

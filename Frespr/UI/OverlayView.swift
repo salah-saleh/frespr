@@ -46,9 +46,8 @@ struct OverlayView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(Color(white: 0.12).opacity(0.97))
         )
-        .background(.clear)
     }
 
     private var isMultiLine: Bool {
@@ -63,20 +62,20 @@ struct OverlayView: View {
         case .error:
             Text(viewModel.errorMessage)
                 .font(.system(.body, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
 
         default:
             if viewModel.displayText.isEmpty {
                 Text(placeholderText)
                     .font(.system(.body, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.5))
             } else {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         Text(viewModel.displayText)
                             .font(.system(.body, design: .rounded))
-                            .foregroundStyle(viewModel.isFinal ? .primary : .secondary)
+                            .foregroundStyle(viewModel.isFinal ? .white : .white.opacity(0.6))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .id("text")
@@ -151,22 +150,22 @@ struct ModeSelectorView: View {
         HStack(spacing: 6) {
             Image(systemName: "wand.and.stars")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(isHovered ? .primary : .secondary)
+                .foregroundStyle(isHovered ? .white : .white.opacity(0.5))
             Text(settings.postProcessingMode.shortLabel)
                 .font(.system(.subheadline, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Image(systemName: "chevron.up.chevron.down")
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.white.opacity(0.4))
                 .opacity(isHovered ? 1 : 0)
         }
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, minHeight: 56)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(isPressed ? AnyShapeStyle(.quaternary) : isHovered ? AnyShapeStyle(.quinary.opacity(1.4)) : AnyShapeStyle(.regularMaterial))
+                .fill(isPressed ? Color(white: 0.20).opacity(0.97) : isHovered ? Color(white: 0.18).opacity(0.97) : Color(white: 0.12).opacity(0.97))
         )
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .onHover { isHovered = $0 }

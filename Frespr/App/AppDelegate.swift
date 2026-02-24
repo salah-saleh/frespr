@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.setup()
         menuBar.onSettings = { [weak self] in self?.openSettings() }
         menuBar.onQuit = { NSApplication.shared.terminate(nil) }
+        menuBar.onReinject = { text in TextInjector.shared.inject(text: text) }
 
         // 2. Overlay window (created but hidden)
         overlayWindow = OverlayWindow(viewModel: overlayViewModel)

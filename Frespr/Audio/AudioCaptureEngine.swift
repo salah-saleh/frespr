@@ -22,6 +22,7 @@ final class AudioCaptureEngine {
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
     private var isRunning = false
+    private var accumulator = Data()  // partial samples between full chunks
 
     // Target: 16kHz, mono, Int16
     private let targetFormat = AVAudioFormat(
@@ -56,8 +57,7 @@ final class AudioCaptureEngine {
         }
         self.converter = converter
 
-        // Buffer to accumulate converted samples
-        var accumulator = Data()
+        accumulator.removeAll()
         let bytesPerChunk = Int(chunkSampleCount) * 2  // Int16 = 2 bytes
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
@@ -87,13 +87,13 @@ final class AudioCaptureEngine {
             let frameCount = Int(outputBuffer.frameLength)
             let rawPointer = UnsafeRawPointer(channelData[0])
             let data = Data(bytes: rawPointer, count: frameCount * 2)
-            accumulator.append(data)
+            self.accumulator.append(data)
 
             // Emit full chunks
             var chunksEmitted = 0
-            while accumulator.count >= bytesPerChunk {
-                let chunk = accumulator.prefix(bytesPerChunk)
-                accumulator.removeFirst(bytesPerChunk)
+            while self.accumulator.count >= bytesPerChunk {
+                let chunk = self.accumulator.prefix(bytesPerChunk)
+                self.accumulator.removeFirst(bytesPerChunk)
                 let chunkData = Data(chunk)
                 self.onAudioChunk?(chunkData)
                 // Compute RMS for silence detection
@@ -124,6 +124,12 @@ final class AudioCaptureEngine {
 
     func stop() {
         guard isRunning else { return }
+        // Drain any partial chunk before stopping so the last <100ms isn't lost.
+        if !accumulator.isEmpty {
+            dbg("audio: draining \(accumulator.count) bytes on stop")
+            onAudioChunk?(accumulator)
+            accumulator.removeAll()
+        }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         converter = nil

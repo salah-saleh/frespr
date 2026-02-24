@@ -5,6 +5,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     var onSettings: (() -> Void)?
     var onQuit: (() -> Void)?
+    var onReinject: ((String) -> Void)?
 
     func setup() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -20,6 +21,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let ppItem = NSMenuItem(title: "Post-processing", action: nil, keyEquivalent: "")
         ppItem.submenu = buildPostProcessingMenu()
         menu.addItem(ppItem)
+
+        let historyItem = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
+        historyItem.submenu = NSMenu()
+        menu.addItem(historyItem)
 
         menu.addItem(.separator())
 
@@ -39,6 +44,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         if let ppItem = menu.item(withTitle: "Post-processing") {
             ppItem.submenu = buildPostProcessingMenu()
+        }
+        if let histItem = menu.item(withTitle: "History") {
+            histItem.submenu = buildHistoryMenu()
         }
     }
 
@@ -64,6 +72,54 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         statusItem?.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "Frespr")
         statusItem?.button?.image?.isTemplate = true
+    }
+
+    private func buildHistoryMenu() -> NSMenu {
+        let sub = NSMenu()
+        let entries = TranscriptionLog.shared.entries.reversed()
+        if entries.isEmpty {
+            let empty = NSMenuItem(title: "(No history)", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            sub.addItem(empty)
+        } else {
+            for (i, entry) in entries.enumerated() {
+                let preview = String(entry.text.prefix(55))
+                    .replacingOccurrences(of: "\n", with: " ")
+                let suffix = entry.text.count > 55 ? "…" : ""
+                let title = "\(Self.relativeTime(entry.timestamp))  \(preview)\(suffix)"
+                let item = NSMenuItem(title: title,
+                                      action: #selector(reinjectHistory(_:)),
+                                      keyEquivalent: "")
+                item.target = self
+                item.tag = i
+                sub.addItem(item)
+            }
+            sub.addItem(.separator())
+            let clear = NSMenuItem(title: "Clear History",
+                                   action: #selector(clearHistory),
+                                   keyEquivalent: "")
+            clear.target = self
+            sub.addItem(clear)
+        }
+        return sub
+    }
+
+    private static func relativeTime(_ date: Date) -> String {
+        let sec = Int(-date.timeIntervalSinceNow)
+        if sec < 60   { return "Just now" }
+        if sec < 3600 { return "\(sec / 60)m ago" }
+        if sec < 86400 { return "\(sec / 3600)h ago" }
+        return "\(sec / 86400)d ago"
+    }
+
+    @objc private func reinjectHistory(_ sender: NSMenuItem) {
+        let entries = Array(TranscriptionLog.shared.entries.reversed())
+        guard sender.tag < entries.count else { return }
+        onReinject?(entries[sender.tag].text)
+    }
+
+    @objc private func clearHistory() {
+        TranscriptionLog.shared.clear()
     }
 
     @objc private func setMode(_ sender: NSMenuItem) {

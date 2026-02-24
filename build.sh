@@ -23,6 +23,7 @@ compile() {
     -module-name Frespr \
     "$SRC/App/Debug.swift" \
     "$SRC/Storage/AppSettings.swift" \
+    "$SRC/Storage/TranscriptionLog.swift" \
     "$SRC/Permissions/PermissionManager.swift" \
     "$SRC/Gemini/GeminiProtocol.swift" \
     "$SRC/Gemini/GeminiLiveService.swift" \
