@@ -2,13 +2,13 @@ import AppKit
 import SwiftUI
 
 final class OverlayWindow: NSPanel {
-    private var hostingView: NSHostingView<OverlayView>?
+    private var hostingView: ClickableHostingView<OverlayRootView>?
     private let viewModel: OverlayViewModel
     private var hideWorkItem: DispatchWorkItem?
     var hasPendingHide: Bool { hideWorkItem != nil }
     private var sizeObservation: NSKeyValueObservation?
 
-    private static let width: CGFloat = 420
+    private static let width: CGFloat = 568
     private static let minHeight: CGFloat = 48
     private static let maxHeight: CGFloat = 240
 
@@ -36,9 +36,10 @@ final class OverlayWindow: NSPanel {
         self.isMovableByWindowBackground = false
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         self.hidesOnDeactivate = false
+        self.becomesKeyOnlyIfNeeded = true
         self.alphaValue = 0
 
-        let hosting = NSHostingView(rootView: OverlayView(viewModel: viewModel))
+        let hosting = ClickableHostingView(rootView: OverlayRootView(viewModel: viewModel))
         hosting.sizingOptions = .intrinsicContentSize
         hosting.frame = NSRect(x: 0, y: 0, width: w, height: h)
         hosting.wantsLayer = true
@@ -131,4 +132,13 @@ final class OverlayWindow: NSPanel {
             self.orderOut(nil)
         })
     }
+
+    override var canBecomeKey: Bool { true }
+    override var acceptsFirstResponder: Bool { true }
+}
+
+/// NSHostingView subclass that accepts first-mouse so SwiftUI buttons fire
+/// on a non-activating panel without requiring the window to become key first.
+final class ClickableHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

@@ -9,6 +9,7 @@ final class TextInjector {
 
     func inject(text: String) {
         guard !text.isEmpty else { return }
+        let text = text.hasSuffix(" ") ? text : text + " "
         dbg("inject: '\(text.prefix(80))'")
 
         if tryAXInjection(text: text) {

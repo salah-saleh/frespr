@@ -141,3 +141,64 @@ struct OverlayView: View {
         }
     }
 }
+
+struct ModeSelectorView: View {
+    private var settings = AppSettings.shared
+    @State private var isPressed = false
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isHovered ? .primary : .secondary)
+            Text(settings.postProcessingMode.shortLabel)
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .opacity(isHovered ? 1 : 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 56)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(isPressed ? AnyShapeStyle(.quaternary) : isHovered ? AnyShapeStyle(.quinary.opacity(1.4)) : AnyShapeStyle(.regularMaterial))
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .onHover { isHovered = $0 }
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: 50, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {
+            settings.postProcessingMode = settings.postProcessingMode.next
+        })
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .animation(.easeInOut(duration: 0.08), value: isPressed)
+    }
+}
+
+struct OverlayRootView: View {
+    var viewModel: OverlayViewModel
+
+    private var showModeSelector: Bool {
+        switch viewModel.state {
+        case .idle, .error: return false
+        case .recording, .processing, .injected: return true
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            OverlayView(viewModel: viewModel)
+            ModeSelectorView()
+                .frame(width: 140)
+                .opacity(showModeSelector ? 1 : 0)
+                .allowsHitTesting(showModeSelector)
+                .animation(.easeInOut(duration: 0.15), value: showModeSelector)
+        }
+        .background(.clear)
+    }
+}

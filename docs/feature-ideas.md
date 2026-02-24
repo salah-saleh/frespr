@@ -16,7 +16,7 @@ Save different settings (post-processing mode, injection mode, custom prompt) pe
 ## 4. History / Session Log
 Keep a local log of transcriptions (timestamp, text, app). Accessible from the menu bar as a dropdown showing the last 10–20 entries. One-click to re-inject any past entry. Persisted to disk, clearable.
 
-## 5. Silence Detection / Auto-Stop
+## 5. Silence Detection / Auto-Stop (done)
 Automatically stop recording after N seconds of silence (configurable). Useful in toggle mode so you don't accidentally leave recording running.
 
 ## 6. Multiple Languages / Locale

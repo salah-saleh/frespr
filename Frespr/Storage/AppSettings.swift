@@ -64,6 +64,21 @@ enum PostProcessingMode: String, CaseIterable {
     case summarize = "summarize"
     case custom    = "custom"
 
+    var shortLabel: String {
+        switch self {
+        case .none:      return "None"
+        case .cleanup:   return "Clean up"
+        case .summarize: return "Summarize"
+        case .custom:    return "Custom"
+        }
+    }
+
+    var next: PostProcessingMode {
+        let all = PostProcessingMode.allCases
+        let idx = all.firstIndex(of: self) ?? 0
+        return all[(idx + 1) % all.count]
+    }
+
     var displayName: String {
         switch self {
         case .none:      return "None (inject raw transcript)"
