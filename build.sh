@@ -8,6 +8,7 @@ APP="$BUILD/Frespr.app"
 PKG="$SCRIPT_DIR/Frespr.pkg"
 SDK="$(xcrun --show-sdk-path --sdk macosx)"
 TARGET="arm64-apple-macosx14.0"
+VERSION="$(cat "$SCRIPT_DIR/VERSION" | tr -d '[:space:]')"
 
 # Usage: ./build.sh [run|pkg]
 #   run  — compile, build .app, sign, kill any running instance, launch (default)
@@ -49,6 +50,7 @@ bundle() {
   mkdir -p "$APP/Contents/Resources"
   cp "$BUILD/Frespr"   "$APP/Contents/MacOS/Frespr"
   cp "$SRC/Info.plist" "$APP/Contents/Info.plist"
+  sed -i '' "s/FRESPR_VERSION/$VERSION/g" "$APP/Contents/Info.plist"
   cp "$SRC/Frespr.entitlements" "$APP/Contents/Resources/" 2>/dev/null || true
   # App icon + menu bar icons
   cp "$SRC/Assets/Frespr.icns"              "$APP/Contents/Resources/Frespr.icns"
@@ -117,7 +119,7 @@ POSTINSTALL
     --scripts "$SCRIPTS" \
     --install-location /Applications \
     --identifier com.frespr.app \
-    --version 1.0 \
+    --version "$VERSION" \
     "$PKG"
 
   echo ""

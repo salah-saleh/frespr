@@ -5,11 +5,30 @@ Native macOS menu bar app for voice-to-text dictation using Gemini Live API. Hol
 ## Build & Install
 
 ```bash
-bash build.sh          # compiles, signs, packages → Frespr.pkg
+bash build.sh          # compiles, signs, launches (dev mode)
+bash build.sh pkg      # compiles, signs, packages → Frespr.pkg
 open Frespr.pkg        # installs to /Applications
 ```
 
 No Xcode needed — uses `swiftc` from Command Line Tools.
+
+## Versioning & Releases
+
+Version is controlled by the `VERSION` file at the repo root (e.g. `1.0.0`).
+`build.sh` reads it automatically; Info.plist uses `FRESPR_VERSION` as a placeholder that gets patched at bundle time.
+
+**To ship a new release:**
+1. Edit `VERSION` to the new version (e.g. `1.1.0`)
+2. Commit: `git commit -am "bump version to 1.1.0"`
+3. Tag: `git tag v1.1.0 && git push origin main --tags`
+4. GitHub Actions (`.github/workflows/release.yml`) builds `Frespr.pkg` on a macOS runner and publishes it as a GitHub Release automatically.
+5. The landing page download links point to `releases/latest/download/Frespr.pkg` so they update immediately.
+
+## GitHub Pages
+
+Landing page at `docs/index.html` is deployed via `.github/workflows/pages.yml` on every push to `main` that touches `docs/`.
+Custom domain: `frespr.com` — configure in repo Settings → Pages → Custom domain.
+The `docs/` folder is the Pages root; add a `CNAME` file there if needed after configuring the domain in Namecheap.
 
 ## Project Structure
 
