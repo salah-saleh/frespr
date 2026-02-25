@@ -7,82 +7,228 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg: #080c14;
+      --surface: #0e1420;
+      --surface-2: #131a28;
+      --border: #1c2640;
+      --border-2: #243050;
+      --text: #e8edf8;
+      --text-muted: #5a6a8a;
+      --text-dim: #8899bb;
+      --accent-1: #4f8ef7;
+      --accent-2: #7b5ef8;
+      --accent-3: #38c8e8;
+      --grad: linear-gradient(135deg, #4f8ef7, #7b5ef8, #38c8e8);
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0d0d0f;
-      color: #f0f0f0;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 40px 24px;
+      padding: 0 24px 80px;
+      overflow-x: hidden;
     }
 
+    /* ── Hero background glow ── */
+    .hero-bg {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(79,142,247,0.12) 0%, rgba(123,94,248,0.07) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Navigation ── */
+    nav {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .nav-logo svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── App Icon ── */
+    .app-icon-wrap {
+      position: relative;
+      z-index: 1;
+      margin-top: 64px;
+      margin-bottom: 36px;
+    }
+
+    .app-icon {
+      width: 100px;
+      height: 100px;
+      border-radius: 26px;
+      background: linear-gradient(145deg, #0d1e3f 0%, #0a1229 50%, #06090f 100%);
+      box-shadow:
+        0 0 0 1px rgba(79,142,247,0.25),
+        0 8px 40px rgba(79,142,247,0.2),
+        0 24px 60px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .app-icon svg {
+      width: 72px;
+      height: 72px;
+    }
+
+    /* Waveform animation */
+    .wave-path {
+      stroke-dasharray: 1200;
+      stroke-dashoffset: 1200;
+      animation: drawWave 2s ease forwards, pulseWave 3s ease-in-out 2s infinite;
+    }
+
+    @keyframes drawWave {
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes pulseWave {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* ── Hero text ── */
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: #1e1e22;
-      border: 1px solid #2a2a30;
+      background: rgba(79,142,247,0.08);
+      border: 1px solid rgba(79,142,247,0.2);
       border-radius: 99px;
-      padding: 6px 14px;
-      font-size: 13px;
-      color: #888;
-      margin-bottom: 32px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: var(--accent-1);
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
     }
 
-    .pill span { color: #f0f0f0; }
+    .pill::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-3);
+      box-shadow: 0 0 6px var(--accent-3);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
 
     h1 {
-      font-size: clamp(40px, 8vw, 72px);
+      font-size: clamp(38px, 7vw, 68px);
       font-weight: 700;
-      letter-spacing: -2px;
+      letter-spacing: -2.5px;
       line-height: 1.05;
       text-align: center;
       margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
     }
 
     h1 em {
       font-style: normal;
-      background: linear-gradient(135deg, #e05252, #e07a52);
+      background: var(--grad);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
     .subtitle {
-      font-size: 18px;
-      color: #888;
+      font-size: 17px;
+      color: var(--text-dim);
       text-align: center;
-      max-width: 480px;
-      line-height: 1.6;
+      max-width: 460px;
+      line-height: 1.65;
       margin-bottom: 40px;
+      position: relative;
+      z-index: 1;
     }
 
+    /* ── Buttons ── */
     .actions {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
       justify-content: center;
-      margin-bottom: 64px;
+      margin-bottom: 80px;
+      position: relative;
+      z-index: 1;
     }
 
     .btn-primary {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      background: #f0f0f0;
-      color: #0d0d0f;
-      font-size: 16px;
+      gap: 9px;
+      background: var(--grad);
+      background-size: 200% 200%;
+      color: #fff;
+      font-size: 15px;
       font-weight: 600;
-      padding: 14px 28px;
+      padding: 13px 26px;
       border-radius: 99px;
       text-decoration: none;
-      transition: background 0.15s, transform 0.1s;
+      transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(79,142,247,0.3);
     }
 
-    .btn-primary:hover { background: #ffffff; transform: translateY(-1px); }
+    .btn-primary:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px rgba(79,142,247,0.4);
+    }
     .btn-primary:active { transform: translateY(0); }
 
     .btn-secondary {
@@ -90,102 +236,272 @@
       align-items: center;
       gap: 8px;
       background: transparent;
-      color: #888;
-      font-size: 15px;
+      color: var(--text-dim);
+      font-size: 14px;
       font-weight: 500;
-      padding: 14px 24px;
+      padding: 13px 22px;
       border-radius: 99px;
-      border: 1px solid #2a2a30;
+      border: 1px solid var(--border-2);
       text-decoration: none;
-      transition: color 0.15s, border-color 0.15s;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
     }
 
-    .btn-secondary:hover { color: #f0f0f0; border-color: #555; }
+    .btn-secondary:hover {
+      color: var(--text);
+      border-color: #3a4a6a;
+      background: rgba(255,255,255,0.03);
+    }
 
+    /* ── Live waveform banner ── */
+    .waveform-banner {
+      width: 100%;
+      max-width: 720px;
+      height: 64px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 80px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+    }
+
+    .waveform-banner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(79,142,247,0.05) 0%, transparent 40%, transparent 60%, rgba(123,94,248,0.05) 100%);
+      pointer-events: none;
+    }
+
+    .waveform-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .waveform-label span {
+      color: var(--accent-3);
+    }
+
+    .waveform-bars {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 40px;
+      flex: 1;
+    }
+
+    .bar {
+      width: 3px;
+      border-radius: 2px;
+      background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
+      animation: barAnim var(--d, 0.8s) ease-in-out infinite alternate;
+      height: var(--h, 20px);
+      opacity: 0.7;
+    }
+
+    @keyframes barAnim {
+      from { transform: scaleY(0.2); opacity: 0.3; }
+      to   { transform: scaleY(1);   opacity: 0.85; }
+    }
+
+    /* ── Features grid ── */
     .features {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
+      gap: 14px;
       max-width: 720px;
       width: 100%;
-      margin-bottom: 64px;
+      margin-bottom: 80px;
     }
 
     .feature {
-      background: #1a1a1e;
-      border: 1px solid #2a2a30;
-      border-radius: 16px;
-      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .feature:hover {
+      border-color: var(--border-2);
+      background: var(--surface-2);
     }
 
     .feature-icon {
-      font-size: 24px;
-      margin-bottom: 10px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(79,142,247,0.08);
+      border: 1px solid rgba(79,142,247,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 14px;
     }
 
     .feature h3 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       margin-bottom: 6px;
+      color: var(--text);
     }
 
     .feature p {
       font-size: 13px;
-      color: #666;
-      line-height: 1.5;
+      color: var(--text-muted);
+      line-height: 1.55;
     }
 
+    /* ── Install card ── */
     .install {
-      background: #1a1a1e;
-      border: 1px solid #2a2a30;
-      border-radius: 16px;
-      padding: 24px 28px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 32px;
       max-width: 560px;
       width: 100%;
-      margin-bottom: 64px;
+      margin-bottom: 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .install::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(79,142,247,0.4), rgba(123,94,248,0.4), transparent);
     }
 
     .install h2 {
-      font-size: 15px;
-      font-weight: 600;
-      color: #888;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 16px;
+      letter-spacing: 0.1em;
+      margin-bottom: 20px;
     }
 
     .install ol {
       padding-left: 20px;
-      color: #ccc;
+      color: var(--text-dim);
       font-size: 14px;
-      line-height: 2;
+      line-height: 2.1;
+      list-style-type: decimal;
+    }
+
+    .install ol li::marker {
+      color: var(--text-muted);
     }
 
     .install code {
-      background: #0d0d0f;
-      border: 1px solid #2a2a30;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
       border-radius: 6px;
       padding: 2px 7px;
       font-family: "SF Mono", Monaco, monospace;
       font-size: 12px;
-      color: #e05252;
+      color: var(--accent-3);
     }
 
+    kbd {
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-size: 12px;
+      font-family: -apple-system, sans-serif;
+      color: var(--text-dim);
+    }
+
+    /* ── Footer ── */
     footer {
-      color: #444;
+      color: var(--text-muted);
       font-size: 13px;
       text-align: center;
+      display: flex;
+      gap: 20px;
+      align-items: center;
     }
 
-    footer a { color: #666; text-decoration: none; }
-    footer a:hover { color: #aaa; }
+    footer a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
+    footer a:hover { color: var(--text); }
+    footer .dot { color: var(--border-2); }
   </style>
 </head>
 <body>
 
-  <div class="pill">
-    ⌥ Hold Right Option to record &nbsp;·&nbsp; <span>macOS 14+</span>
+  <div class="hero-bg"></div>
+
+  <!-- Nav -->
+  <nav>
+    <a class="nav-logo" href="#">
+      <!-- Mini waveform logo -->
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="28" height="28" rx="7" fill="url(#ngrad)"/>
+        <path d="M4 14 Q6 9 8 14 Q10 19 12 14 Q14 9 16 14 Q18 19 20 14 Q22 9 24 14"
+              stroke="url(#wgrad)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+        <defs>
+          <linearGradient id="ngrad" x1="0" y1="0" x2="28" y2="28">
+            <stop offset="0%" stop-color="#0d1e3f"/>
+            <stop offset="100%" stop-color="#06090f"/>
+          </linearGradient>
+          <linearGradient id="wgrad" x1="0" y1="0" x2="28" y2="0">
+            <stop offset="0%" stop-color="#4f8ef7"/>
+            <stop offset="50%" stop-color="#7b5ef8"/>
+            <stop offset="100%" stop-color="#38c8e8"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      Frespr
+    </a>
+    <div class="nav-links">
+      <a href="https://github.com/salah-saleh/frespr">GitHub</a>
+      <a href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">Download</a>
+    </div>
+  </nav>
+
+  <!-- App Icon -->
+  <div class="app-icon-wrap">
+    <div class="app-icon">
+      <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="iconGrad" x1="0" y1="0" x2="72" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#4f8ef7"/>
+            <stop offset="45%" stop-color="#7b5ef8"/>
+            <stop offset="100%" stop-color="#38c8e8"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Outer waveform (large) -->
+        <path class="wave-path"
+          d="M4 36 Q9 18 14 36 Q19 54 24 36 Q29 18 34 36 Q39 54 44 36 Q49 18 54 36 Q59 54 64 36 Q67 27 70 36"
+          stroke="url(#iconGrad)" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#glow)" opacity="0.9"/>
+        <!-- Inner waveform (small, offset) -->
+        <path
+          d="M4 36 Q10 24 16 36 Q22 48 28 36 Q34 24 40 36 Q46 48 52 36 Q58 24 64 36 Q67 30 70 36"
+          stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.3"/>
+      </svg>
+    </div>
   </div>
+
+  <!-- Hero -->
+  <div class="pill">Live now · macOS 14+</div>
 
   <h1>Voice to text,<br><em>instantly.</em></h1>
 
@@ -196,13 +512,22 @@
 
   <div class="actions">
     <a class="btn-primary" href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">
-      &#8659; &nbsp;Download for Mac
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Download for Mac
     </a>
     <a class="btn-secondary" href="https://github.com/salah-saleh/frespr">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       View on GitHub
     </a>
   </div>
 
+  <!-- Animated waveform banner -->
+  <div class="waveform-banner">
+    <div class="waveform-label"><span>●</span> &nbsp;Awaiting voice…</div>
+    <div class="waveform-bars" id="bars"></div>
+  </div>
+
+  <!-- Features -->
   <div class="features">
     <div class="feature">
       <div class="feature-icon">🎙</div>
@@ -226,6 +551,7 @@
     </div>
   </div>
 
+  <!-- Install -->
   <div class="install">
     <h2>Getting Started</h2>
     <ol>
@@ -233,15 +559,33 @@
       <li>If blocked by Gatekeeper, run:<br>
         <code>xattr -dr com.apple.quarantine /Applications/Frespr.app</code>
       </li>
-      <li>Add your <a href="https://aistudio.google.com/apikey" style="color:#e05252">Gemini API key</a> in Settings</li>
-      <li>Hold <kbd style="background:#2a2a30;padding:1px 6px;border-radius:4px;font-size:12px">Right ⌥</kbd> and speak</li>
+      <li>Add your <a href="https://aistudio.google.com/apikey" style="color:var(--accent-1)">Gemini API key</a> in Settings</li>
+      <li>Hold <kbd>Right ⌥</kbd> and speak</li>
     </ol>
   </div>
 
   <footer>
-    <a href="https://github.com/salah-saleh/frespr">GitHub</a> &nbsp;·&nbsp;
-    Free and open source
+    <a href="https://github.com/salah-saleh/frespr">GitHub</a>
+    <span class="dot">·</span>
+    Free &amp; open source
+    <span class="dot">·</span>
+    macOS 14+
   </footer>
+
+  <script>
+    // Generate animated waveform bars
+    const container = document.getElementById('bars');
+    const count = 60;
+    for (let i = 0; i < count; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      const h = Math.random() * 28 + 6;
+      const d = (Math.random() * 0.6 + 0.4).toFixed(2);
+      const delay = (Math.random() * 1.2).toFixed(2);
+      bar.style.cssText = `--h:${h}px; --d:${d}s; animation-delay:-${delay}s; height:${h}px;`;
+      container.appendChild(bar);
+    }
+  </script>
 
 </body>
 </html>

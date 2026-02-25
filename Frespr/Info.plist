@@ -38,6 +38,10 @@
 	<key>NSInputMonitoringUsageDescription</key>
 	<string>Frespr needs to detect the Right Option key while other apps are focused.</string>
 
+	<!-- App icon -->
+	<key>CFBundleIconFile</key>
+	<string>Frespr</string>
+
 	<!-- No storyboard -->
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>

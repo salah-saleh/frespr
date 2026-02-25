@@ -50,6 +50,14 @@ bundle() {
   cp "$BUILD/Frespr"   "$APP/Contents/MacOS/Frespr"
   cp "$SRC/Info.plist" "$APP/Contents/Info.plist"
   cp "$SRC/Frespr.entitlements" "$APP/Contents/Resources/" 2>/dev/null || true
+  # App icon + menu bar icons
+  cp "$SRC/Assets/Frespr.icns"              "$APP/Contents/Resources/Frespr.icns"
+  cp "$SRC/Assets/menubar.png"              "$APP/Contents/Resources/menubar.png"
+  cp "$SRC/Assets/menubar@2x.png"           "$APP/Contents/Resources/menubar@2x.png"
+  cp "$SRC/Assets/menubar-recording.png"    "$APP/Contents/Resources/menubar-recording.png"
+  cp "$SRC/Assets/menubar-recording@2x.png" "$APP/Contents/Resources/menubar-recording@2x.png"
+  cp "$SRC/Assets/menubar-processing.png"   "$APP/Contents/Resources/menubar-processing.png"
+  cp "$SRC/Assets/menubar-processing@2x.png" "$APP/Contents/Resources/menubar-processing@2x.png"
 
   echo "==> Ad-hoc signing"
   codesign --force --deep --sign - "$APP"

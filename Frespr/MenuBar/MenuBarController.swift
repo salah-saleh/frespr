@@ -12,7 +12,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         statusItem = item
 
         guard let button = item.button else { return }
-        button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "Frespr")
+        button.image = Self.menuBarImage(named: "menubar") ?? NSImage(systemSymbolName: "mic", accessibilityDescription: "Frespr")
         button.image?.isTemplate = true
 
         let menu = NSMenu()
@@ -66,12 +66,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func setIcon(_ icon: MenuBarIcon) {
         let name: String
         switch icon {
-        case .idle:       name = "mic"
-        case .recording:  name = "mic.fill"
-        case .processing: name = "waveform"
+        case .idle:       name = "menubar"
+        case .recording:  name = "menubar-recording"
+        case .processing: name = "menubar-processing"
         }
-        statusItem?.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "Frespr")
+        statusItem?.button?.image = Self.menuBarImage(named: name)
         statusItem?.button?.image?.isTemplate = true
+    }
+
+    // Load the @2x-aware menu bar PNG from the app bundle
+    private static func menuBarImage(named name: String) -> NSImage? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png") else { return nil }
+        guard let img = NSImage(contentsOf: url) else { return nil }
+        img.size = NSSize(width: 18, height: 18)
+        img.isTemplate = true
+        return img
     }
 
     private func buildHistoryMenu() -> NSMenu {
