@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let monitor = GlobalHotKeyMonitor()
         monitor.option = AppSettings.shared.hotKeyOption
         monitor.onKeyDown = { Task { @MainActor [weak self] in self?.coordinator.handleHotkeyPress() } }
+        monitor.onPermissionNeeded = { Task { @MainActor [weak self] in self?.handleAccessibilityPermissionNeeded() } }
         monitor.start()
         hotKeyMonitor = monitor
 
@@ -122,6 +123,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wc.onClose = { [weak self] in self?.settingsWC = nil }
         settingsWC = wc
         wc.showSettings()
+    }
+
+    // MARK: - Accessibility Permission
+
+    private func handleAccessibilityPermissionNeeded() {
+        showErrorToast("Frespr needs Accessibility access to detect the hotkey. Please grant it in System Settings → Privacy → Accessibility, then relaunch.")
+        PermissionManager.shared.requestAccessibilityAccess()
     }
 
     // MARK: - Error Toast

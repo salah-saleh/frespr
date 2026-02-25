@@ -149,22 +149,30 @@ final class GeminiSessionCoordinator {
             return
         }
 
-        guard PermissionManager.shared.microphoneAuthorized else {
-            let msg = "Microphone access is required. Open Settings to grant permission."
-            state = .error(msg)
-            onError?(msg)
-            return
-        }
+        Task { @MainActor in
+            // If mic permission hasn't been granted yet, request it now and wait.
+            if !PermissionManager.shared.microphoneAuthorized {
+                let granted = await PermissionManager.shared.requestMicrophoneAccess()
+                guard granted else {
+                    let msg = "Microphone access is required. Grant it in System Settings → Privacy → Microphone."
+                    self.state = .error(msg)
+                    self.onError?(msg)
+                    return
+                }
+                // Small delay so AVAudioEngine's inputNode re-initialises with the real format.
+                try? await Task.sleep(nanoseconds: 300_000_000)
+            }
 
-        accumulatedTranscript = ""
-        connectBuffer.removeAll()
-        dbg("startRecording — starting audio capture immediately, then connecting")
-        state = .connecting
-        startAudioCapture()
+            guard self.state == .idle else { return }  // user may have pressed again
 
-        Task {
+            self.accumulatedTranscript = ""
+            self.connectBuffer.removeAll()
+            dbg("startRecording — starting audio capture immediately, then connecting")
+            self.state = .connecting
+            self.startAudioCapture()
+
             do {
-                try await geminiService.connect(apiKey: apiKey)
+                try await self.geminiService.connect(apiKey: apiKey)
             } catch {
                 self.state = .error(error.localizedDescription)
                 self.onError?(error.localizedDescription)
