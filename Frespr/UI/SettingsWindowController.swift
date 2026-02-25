@@ -31,6 +31,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "Frespr Settings"
         window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = NSColor(red: 0.043, green: 0.067, blue: 0.110, alpha: 1) // #0b1120
         self.init(window: window)
         window.delegate = self
         buildUI()
@@ -227,8 +230,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func sectionHeader(_ title: String) -> NSTextField {
-        let tf = NSTextField(labelWithString: title)
-        tf.font = .boldSystemFont(ofSize: 12)
+        let tf = NSTextField(labelWithString: title.uppercased())
+        tf.font = .systemFont(ofSize: 10, weight: .bold)
+        tf.textColor = NSColor(red: 0.357, green: 0.612, blue: 0.965, alpha: 1) // brand blue #5b9cf6
         return tf
     }
 

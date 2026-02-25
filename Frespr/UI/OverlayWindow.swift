@@ -2,15 +2,13 @@ import AppKit
 import SwiftUI
 
 final class OverlayWindow: NSPanel {
-    private var hostingView: ClickableHostingView<OverlayRootView>?
     private let viewModel: OverlayViewModel
     private var hideWorkItem: DispatchWorkItem?
     var hasPendingHide: Bool { hideWorkItem != nil }
-    private var sizeObservation: NSKeyValueObservation?
 
-    private static let width: CGFloat = 568
-    private static let minHeight: CGFloat = 48
-    private static let maxHeight: CGFloat = 240
+    private static let width: CGFloat = 680
+    private static let minHeight: CGFloat = 52
+    private static let maxHeight: CGFloat = 280
 
     init(viewModel: OverlayViewModel) {
         self.viewModel = viewModel
@@ -40,17 +38,20 @@ final class OverlayWindow: NSPanel {
         self.alphaValue = 0
 
         let hosting = ClickableHostingView(rootView: OverlayRootView(viewModel: viewModel))
-        hosting.sizingOptions = .intrinsicContentSize
-        hosting.frame = NSRect(x: 0, y: 0, width: w, height: h)
+        hosting.sizingOptions = [.intrinsicContentSize]
         hosting.wantsLayer = true
         hosting.layer?.backgroundColor = .clear
         hosting.layer?.isOpaque = false
         self.contentView = hosting
-        hostingView = hosting
 
-        sizeObservation = hosting.observe(\.intrinsicContentSize, options: [.new]) { [weak self] view, _ in
-            let sz = view.intrinsicContentSize
-            self?.fitToContent(width: sz.width > 0 ? sz.width : w)
+        // Poll height every ~50ms while visible — NSHostingView updates fittingSize
+        // asynchronously; polling is more reliable than KVO across macOS versions.
+        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self, self.alphaValue > 0 else { return }
+            let desired = hosting.fittingSize.height
+            if desired > 1 && abs(desired - self.frame.height) > 1 {
+                self.fitToContent(intrinsicHeight: desired)
+            }
         }
     }
 
@@ -59,7 +60,11 @@ final class OverlayWindow: NSPanel {
     func show() {
         hideWorkItem?.cancel()
         hideWorkItem = nil
-        reposition()
+        // Only reposition when not already visible — avoids jumping when
+        // show() is called again mid-session (e.g. flashInjected after recording).
+        if self.alphaValue == 0 {
+            reposition()
+        }
         self.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
@@ -104,13 +109,11 @@ final class OverlayWindow: NSPanel {
         self.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
     }
 
-    private func fitToContent(width: CGFloat) {
-        guard let hosting = hostingView else { return }
-        let desired = hosting.fittingSize.height
-        let newH = max(OverlayWindow.minHeight, min(OverlayWindow.maxHeight, desired))
+    private func fitToContent(intrinsicHeight: CGFloat) {
+        let newH = max(OverlayWindow.minHeight, min(OverlayWindow.maxHeight, intrinsicHeight))
         let currentFrame = self.frame
-        let newY = currentFrame.minY + currentFrame.height - newH
-        let newFrame = NSRect(x: currentFrame.minX, y: newY, width: OverlayWindow.width, height: newH)
+        // Keep the bottom edge fixed; grow upward.
+        let newFrame = NSRect(x: currentFrame.minX, y: currentFrame.minY, width: OverlayWindow.width, height: newH)
         self.setFrame(newFrame, display: true, animate: false)
     }
 

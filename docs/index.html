@@ -8,41 +8,62 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #080c14;
-      --surface: #0e1420;
-      --surface-2: #131a28;
-      --border: #1c2640;
-      --border-2: #243050;
-      --text: #e8edf8;
-      --text-muted: #5a6a8a;
-      --text-dim: #8899bb;
-      --accent-1: #4f8ef7;
-      --accent-2: #7b5ef8;
-      --accent-3: #38c8e8;
-      --grad: linear-gradient(135deg, #4f8ef7, #7b5ef8, #38c8e8);
+      --bg: #060a10;
+      --surface: #0c1220;
+      --surface-2: #111826;
+      --surface-3: #161f30;
+      --border: #1a2438;
+      --border-2: #22304a;
+      --border-3: #2c3f5e;
+      --text: #edf2ff;
+      --text-muted: #4d607f;
+      --text-dim: #7d93b8;
+      --accent-1: #5b9cf6;
+      --accent-2: #8b6ff8;
+      --accent-3: #36d4f0;
+      --accent-4: #f06292;
+      --grad: linear-gradient(135deg, #5b9cf6 0%, #8b6ff8 50%, #36d4f0 100%);
+      --grad-subtle: linear-gradient(135deg, rgba(91,156,246,0.12), rgba(139,111,248,0.12), rgba(54,212,240,0.08));
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 0 24px 80px;
+      padding: 0 24px 100px;
       overflow-x: hidden;
     }
 
-    /* ── Hero background glow ── */
+    /* ── Grid background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(91,156,246,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91,156,246,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 80%);
+    }
+
+    /* ── Hero radial glow ── */
     .hero-bg {
       position: fixed;
-      top: -200px;
+      top: -300px;
       left: 50%;
       transform: translateX(-50%);
-      width: 900px;
-      height: 600px;
-      background: radial-gradient(ellipse at center, rgba(79,142,247,0.12) 0%, rgba(123,94,248,0.07) 40%, transparent 70%);
+      width: 1100px;
+      height: 800px;
+      background:
+        radial-gradient(ellipse 60% 50% at 40% 40%, rgba(91,156,246,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 40% at 65% 55%, rgba(139,111,248,0.14) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 50% 70%, rgba(54,212,240,0.08) 0%, transparent 55%);
       pointer-events: none;
       z-index: 0;
     }
@@ -50,80 +71,152 @@
     /* ── Navigation ── */
     nav {
       width: 100%;
-      max-width: 900px;
+      max-width: 920px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 24px 0;
+      padding: 28px 0;
       position: relative;
-      z-index: 1;
+      z-index: 10;
     }
 
     .nav-logo {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: -0.3px;
+      letter-spacing: -0.4px;
       color: var(--text);
       text-decoration: none;
     }
 
-    .nav-logo svg {
-      width: 28px;
-      height: 28px;
+    .nav-logo-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #0d2048, #07091a);
+      border: 1px solid rgba(91,156,246,0.3);
+      box-shadow: 0 0 12px rgba(91,156,246,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .nav-links {
       display: flex;
-      gap: 24px;
+      gap: 6px;
       align-items: center;
     }
 
     .nav-links a {
-      font-size: 14px;
-      color: var(--text-muted);
+      font-size: 13px;
+      color: var(--text-dim);
       text-decoration: none;
-      transition: color 0.15s;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: color 0.15s, background 0.15s;
     }
 
-    .nav-links a:hover { color: var(--text); }
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+    }
 
-    /* ── App Icon ── */
-    .app-icon-wrap {
+    .nav-links .nav-download {
+      background: rgba(91,156,246,0.1);
+      border: 1px solid rgba(91,156,246,0.2);
+      color: var(--accent-1);
+    }
+
+    .nav-links .nav-download:hover {
+      background: rgba(91,156,246,0.18);
+      color: #7db8ff;
+    }
+
+    /* ── Hero ── */
+    .hero {
       position: relative;
       z-index: 1;
-      margin-top: 64px;
-      margin-bottom: 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 70px;
+      padding-bottom: 0;
+      width: 100%;
+    }
+
+    /* App icon with rings */
+    .icon-stack {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin-bottom: 44px;
+    }
+
+    .icon-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation: ringPulse 3s ease-in-out infinite;
+    }
+
+    .icon-ring-1 {
+      width: 160px;
+      height: 160px;
+      border-color: rgba(91,156,246,0.12);
+      animation-delay: 0s;
+    }
+
+    .icon-ring-2 {
+      width: 200px;
+      height: 200px;
+      border-color: rgba(139,111,248,0.07);
+      animation-delay: 0.5s;
+    }
+
+    .icon-ring-3 {
+      width: 244px;
+      height: 244px;
+      border-color: rgba(54,212,240,0.04);
+      animation-delay: 1s;
+    }
+
+    @keyframes ringPulse {
+      0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.03); }
     }
 
     .app-icon {
-      width: 100px;
-      height: 100px;
-      border-radius: 26px;
-      background: linear-gradient(145deg, #0d1e3f 0%, #0a1229 50%, #06090f 100%);
+      width: 120px;
+      height: 120px;
+      border-radius: 28px;
+      background: linear-gradient(145deg, #0e2248 0%, #09142e 50%, #060a1a 100%);
       box-shadow:
-        0 0 0 1px rgba(79,142,247,0.25),
-        0 8px 40px rgba(79,142,247,0.2),
-        0 24px 60px rgba(0,0,0,0.5),
-        inset 0 1px 0 rgba(255,255,255,0.06);
+        0 0 0 1px rgba(91,156,246,0.3),
+        0 0 30px rgba(91,156,246,0.25),
+        0 20px 60px rgba(0,0,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        inset 0 -1px 0 rgba(0,0,0,0.3);
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
+      position: relative;
+      z-index: 1;
     }
 
     .app-icon svg {
-      width: 72px;
-      height: 72px;
+      width: 84px;
+      height: 84px;
     }
 
-    /* Waveform animation */
     .wave-path {
       stroke-dasharray: 1200;
       stroke-dashoffset: 1200;
-      animation: drawWave 2s ease forwards, pulseWave 3s ease-in-out 2s infinite;
+      animation: drawWave 1.8s cubic-bezier(0.4,0,0.2,1) forwards, pulseWave 3s ease-in-out 1.8s infinite;
     }
 
     @keyframes drawWave {
@@ -132,50 +225,47 @@
 
     @keyframes pulseWave {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
+      50% { opacity: 0.55; }
     }
 
-    /* ── Hero text ── */
+    /* Pill badge */
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(79,142,247,0.08);
-      border: 1px solid rgba(79,142,247,0.2);
+      background: rgba(54,212,240,0.06);
+      border: 1px solid rgba(54,212,240,0.18);
       border-radius: 99px;
-      padding: 5px 14px;
+      padding: 5px 14px 5px 10px;
       font-size: 12px;
-      color: var(--accent-1);
-      margin-bottom: 24px;
-      position: relative;
-      z-index: 1;
+      font-weight: 500;
+      color: var(--accent-3);
+      margin-bottom: 28px;
+      letter-spacing: 0.01em;
     }
 
-    .pill::before {
-      content: '';
-      display: inline-block;
+    .pill-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
       background: var(--accent-3);
-      box-shadow: 0 0 6px var(--accent-3);
+      box-shadow: 0 0 8px var(--accent-3);
       animation: blink 2s ease-in-out infinite;
+      flex-shrink: 0;
     }
 
     @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--accent-3); }
+      50% { opacity: 0.4; box-shadow: 0 0 3px var(--accent-3); }
     }
 
     h1 {
-      font-size: clamp(38px, 7vw, 68px);
-      font-weight: 700;
-      letter-spacing: -2.5px;
-      line-height: 1.05;
+      font-size: clamp(44px, 8vw, 76px);
+      font-weight: 800;
+      letter-spacing: -3px;
+      line-height: 1.0;
       text-align: center;
-      margin-bottom: 20px;
-      position: relative;
-      z-index: 1;
+      margin-bottom: 22px;
     }
 
     h1 em {
@@ -187,14 +277,13 @@
     }
 
     .subtitle {
-      font-size: 17px;
+      font-size: 18px;
       color: var(--text-dim);
       text-align: center;
-      max-width: 460px;
-      line-height: 1.65;
-      margin-bottom: 40px;
-      position: relative;
-      z-index: 1;
+      max-width: 480px;
+      line-height: 1.7;
+      margin-bottom: 44px;
+      font-weight: 400;
     }
 
     /* ── Buttons ── */
@@ -204,8 +293,6 @@
       flex-wrap: wrap;
       justify-content: center;
       margin-bottom: 80px;
-      position: relative;
-      z-index: 1;
     }
 
     .btn-primary {
@@ -213,215 +300,437 @@
       align-items: center;
       gap: 9px;
       background: var(--grad);
-      background-size: 200% 200%;
       color: #fff;
       font-size: 15px;
       font-weight: 600;
-      padding: 13px 26px;
-      border-radius: 99px;
+      padding: 14px 28px;
+      border-radius: 12px;
       text-decoration: none;
-      transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
-      box-shadow: 0 4px 20px rgba(79,142,247,0.3);
+      transition: opacity 0.15s, transform 0.12s, box-shadow 0.15s;
+      box-shadow:
+        0 4px 24px rgba(91,156,246,0.35),
+        0 1px 0 rgba(255,255,255,0.15) inset;
+      letter-spacing: -0.1px;
     }
 
     .btn-primary:hover {
-      opacity: 0.92;
-      transform: translateY(-1px);
-      box-shadow: 0 8px 30px rgba(79,142,247,0.4);
+      opacity: 0.9;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px rgba(91,156,246,0.45), 0 1px 0 rgba(255,255,255,0.15) inset;
     }
-    .btn-primary:active { transform: translateY(0); }
+
+    .btn-primary:active { transform: translateY(0); opacity: 1; }
 
     .btn-secondary {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: transparent;
+      background: rgba(255,255,255,0.04);
       color: var(--text-dim);
       font-size: 14px;
       font-weight: 500;
-      padding: 13px 22px;
-      border-radius: 99px;
+      padding: 14px 24px;
+      border-radius: 12px;
       border: 1px solid var(--border-2);
       text-decoration: none;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
+      letter-spacing: -0.1px;
     }
 
     .btn-secondary:hover {
       color: var(--text);
-      border-color: #3a4a6a;
-      background: rgba(255,255,255,0.03);
+      border-color: var(--border-3);
+      background: rgba(255,255,255,0.06);
     }
 
-    /* ── Live waveform banner ── */
-    .waveform-banner {
+    /* ── Demo overlay mock ── */
+    .demo-wrap {
       width: 100%;
-      max-width: 720px;
-      height: 64px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      margin-bottom: 80px;
+      max-width: 680px;
+      margin-bottom: 90px;
       position: relative;
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
-      gap: 16px;
     }
 
-    .waveform-banner::before {
-      content: '';
+    .demo-glow {
       position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, rgba(79,142,247,0.05) 0%, transparent 40%, transparent 60%, rgba(123,94,248,0.05) 100%);
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 80px;
+      background: radial-gradient(ellipse at center, rgba(91,156,246,0.2) 0%, transparent 70%);
       pointer-events: none;
     }
 
-    .waveform-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      white-space: nowrap;
+    .demo-overlay {
+      background: rgba(12, 18, 32, 0.92);
+      border: 1px solid var(--border-2);
+      border-radius: 20px;
+      padding: 20px 24px;
+      backdrop-filter: blur(20px);
+      box-shadow:
+        0 0 0 1px rgba(91,156,246,0.1),
+        0 24px 80px rgba(0,0,0,0.6),
+        0 1px 0 rgba(255,255,255,0.05) inset;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .demo-overlay::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(91,156,246,0.5) 30%, rgba(139,111,248,0.5) 70%, transparent 100%);
+    }
+
+    .demo-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .demo-mic {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(54,212,240,0.12);
+      border: 1px solid rgba(54,212,240,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
     }
 
-    .waveform-label span {
+    .demo-status {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
       color: var(--accent-3);
     }
 
-    .waveform-bars {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      height: 40px;
-      flex: 1;
+    .demo-timer {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      font-family: "SF Mono", Monaco, monospace;
     }
 
-    .bar {
+    .demo-waveform {
+      display: flex;
+      align-items: center;
+      gap: 2.5px;
+      height: 36px;
+      margin-bottom: 16px;
+    }
+
+    .demo-bar {
       width: 3px;
       border-radius: 2px;
       background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
-      animation: barAnim var(--d, 0.8s) ease-in-out infinite alternate;
-      height: var(--h, 20px);
-      opacity: 0.7;
+      animation: dBarAnim var(--d, 0.7s) ease-in-out infinite alternate;
+      opacity: 0.75;
     }
 
-    @keyframes barAnim {
-      from { transform: scaleY(0.2); opacity: 0.3; }
-      to   { transform: scaleY(1);   opacity: 0.85; }
+    @keyframes dBarAnim {
+      from { transform: scaleY(0.15); opacity: 0.25; }
+      to   { transform: scaleY(1);    opacity: 0.85; }
+    }
+
+    .demo-transcript {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text);
+      min-height: 26px;
+    }
+
+    .demo-transcript .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--accent-3);
+      border-radius: 1px;
+      margin-left: 2px;
+      vertical-align: -0.1em;
+      animation: cursorBlink 1s step-end infinite;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .demo-footer {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .demo-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface-3);
+      border: 1px solid var(--border-2);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      font-family: -apple-system, sans-serif;
+    }
+
+    .demo-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .demo-tag {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 99px;
+      background: rgba(139,111,248,0.1);
+      border: 1px solid rgba(139,111,248,0.2);
+      color: var(--accent-2);
+      font-weight: 600;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+      text-align: center;
+      margin-bottom: 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent-1);
+      margin-bottom: 12px;
+      opacity: 0.8;
+    }
+
+    .section-title {
+      font-size: clamp(26px, 4vw, 36px);
+      font-weight: 700;
+      letter-spacing: -1.2px;
+      color: var(--text);
+      line-height: 1.15;
+    }
+
+    .section-title em {
+      font-style: normal;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     /* ── Features grid ── */
     .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px;
-      max-width: 720px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      max-width: 920px;
       width: 100%;
-      margin-bottom: 80px;
+      margin-bottom: 90px;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 780px) {
+      .features { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+      .features { grid-template-columns: 1fr; }
     }
 
     .feature {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .feature:hover {
-      border-color: var(--border-2);
-      background: var(--surface-2);
-    }
-
-    .feature-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      background: rgba(79,142,247,0.08);
-      border: 1px solid rgba(79,142,247,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      margin-bottom: 14px;
-    }
-
-    .feature h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: var(--text);
-    }
-
-    .feature p {
-      font-size: 13px;
-      color: var(--text-muted);
-      line-height: 1.55;
-    }
-
-    /* ── Install card ── */
-    .install {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 28px 32px;
-      max-width: 560px;
-      width: 100%;
-      margin-bottom: 80px;
+      border-radius: 16px;
+      padding: 20px;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
       position: relative;
       overflow: hidden;
     }
 
-    .install::before {
+    .feature::after {
       content: '';
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(79,142,247,0.4), rgba(123,94,248,0.4), transparent);
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+      background: var(--grad-subtle);
     }
 
-    .install h2 {
+    .feature:hover {
+      border-color: var(--border-3);
+      background: var(--surface-2);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+    }
+
+    .feature:hover::after { opacity: 1; }
+
+    .feature-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      margin-bottom: 14px;
+      position: relative;
+      z-index: 1;
+      flex-shrink: 0;
+    }
+
+    .fi-blue  { background: rgba(91,156,246,0.1);  border: 1px solid rgba(91,156,246,0.2); }
+    .fi-purple{ background: rgba(139,111,248,0.1); border: 1px solid rgba(139,111,248,0.2); }
+    .fi-cyan  { background: rgba(54,212,240,0.1);  border: 1px solid rgba(54,212,240,0.2); }
+    .fi-pink  { background: rgba(240,98,146,0.1);  border: 1px solid rgba(240,98,146,0.2); }
+
+    .feature h3 {
+      font-size: 13px;
+      font-weight: 650;
+      margin-bottom: 6px;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Getting started ── */
+    .setup-wrap {
+      max-width: 560px;
+      width: 100%;
+      margin-bottom: 90px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .setup-card {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      position: relative;
+    }
+
+    .setup-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(91,156,246,0.5), rgba(139,111,248,0.5), transparent);
+    }
+
+    .setup-title {
       font-size: 11px;
       font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
       letter-spacing: 0.1em;
-      margin-bottom: 20px;
-    }
-
-    .install ol {
-      padding-left: 20px;
-      color: var(--text-dim);
-      font-size: 14px;
-      line-height: 2.1;
-      list-style-type: decimal;
-    }
-
-    .install ol li::marker {
+      text-transform: uppercase;
       color: var(--text-muted);
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .install code {
-      background: rgba(0,0,0,0.4);
-      border: 1px solid var(--border);
+    .setup-title::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      box-shadow: 0 0 6px var(--accent-1);
+    }
+
+    .setup-steps {
+      padding: 6px 0;
+    }
+
+    .setup-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .setup-step:last-child { border-bottom: none; }
+    .setup-step:hover { background: var(--surface-2); }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
       border-radius: 6px;
-      padding: 2px 7px;
-      font-family: "SF Mono", Monaco, monospace;
+      background: rgba(91,156,246,0.1);
+      border: 1px solid rgba(91,156,246,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-1);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-body {
+      font-size: 13.5px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .step-body a { color: var(--accent-1); text-decoration: none; }
+    .step-body a:hover { color: #8cc0ff; text-decoration: underline; }
+
+    code {
+      background: rgba(0,0,0,0.45);
+      border: 1px solid var(--border-2);
+      border-radius: 5px;
+      padding: 1.5px 7px;
+      font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
       font-size: 12px;
       color: var(--accent-3);
     }
 
     kbd {
-      background: var(--surface-2);
-      border: 1px solid var(--border-2);
-      border-radius: 5px;
-      padding: 1px 7px;
+      background: var(--surface-3);
+      border: 1px solid var(--border-3);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 1px 8px;
       font-size: 12px;
+      font-weight: 600;
       font-family: -apple-system, sans-serif;
       color: var(--text-dim);
     }
@@ -429,15 +738,17 @@
     /* ── Footer ── */
     footer {
       color: var(--text-muted);
-      font-size: 13px;
+      font-size: 12.5px;
       text-align: center;
       display: flex;
-      gap: 20px;
+      gap: 18px;
       align-items: center;
+      position: relative;
+      z-index: 1;
     }
 
     footer a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
-    footer a:hover { color: var(--text); }
+    footer a:hover { color: var(--text-dim); }
     footer .dot { color: var(--border-2); }
   </style>
 </head>
@@ -448,143 +759,262 @@
   <!-- Nav -->
   <nav>
     <a class="nav-logo" href="#">
-      <!-- Mini waveform logo -->
-      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="28" height="28" rx="7" fill="url(#ngrad)"/>
-        <path d="M4 14 Q6 9 8 14 Q10 19 12 14 Q14 9 16 14 Q18 19 20 14 Q22 9 24 14"
-              stroke="url(#wgrad)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-        <defs>
-          <linearGradient id="ngrad" x1="0" y1="0" x2="28" y2="28">
-            <stop offset="0%" stop-color="#0d1e3f"/>
-            <stop offset="100%" stop-color="#06090f"/>
-          </linearGradient>
-          <linearGradient id="wgrad" x1="0" y1="0" x2="28" y2="0">
-            <stop offset="0%" stop-color="#4f8ef7"/>
-            <stop offset="50%" stop-color="#7b5ef8"/>
-            <stop offset="100%" stop-color="#38c8e8"/>
-          </linearGradient>
-        </defs>
-      </svg>
+      <div class="nav-logo-icon">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <path d="M2 10 Q4 6 6 10 Q8 14 10 10 Q12 6 14 10 Q16 14 18 10"
+                stroke="url(#ng)" stroke-width="1.6" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="ng" x1="2" y1="0" x2="18" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#5b9cf6"/>
+              <stop offset="50%" stop-color="#8b6ff8"/>
+              <stop offset="100%" stop-color="#36d4f0"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
       Frespr
     </a>
     <div class="nav-links">
       <a href="https://github.com/salah-saleh/frespr">GitHub</a>
-      <a href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">Download</a>
+      <a href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg" class="nav-download">Download</a>
     </div>
   </nav>
 
-  <!-- App Icon -->
-  <div class="app-icon-wrap">
-    <div class="app-icon">
-      <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="iconGrad" x1="0" y1="0" x2="72" y2="0" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#4f8ef7"/>
-            <stop offset="45%" stop-color="#7b5ef8"/>
-            <stop offset="100%" stop-color="#38c8e8"/>
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2.5" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <!-- Outer waveform (large) -->
-        <path class="wave-path"
-          d="M4 36 Q9 18 14 36 Q19 54 24 36 Q29 18 34 36 Q39 54 44 36 Q49 18 54 36 Q59 54 64 36 Q67 27 70 36"
-          stroke="url(#iconGrad)" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#glow)" opacity="0.9"/>
-        <!-- Inner waveform (small, offset) -->
-        <path
-          d="M4 36 Q10 24 16 36 Q22 48 28 36 Q34 24 40 36 Q46 48 52 36 Q58 24 64 36 Q67 30 70 36"
-          stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.3"/>
-      </svg>
-    </div>
-  </div>
-
   <!-- Hero -->
-  <div class="pill">Live now · macOS 14+</div>
+  <section class="hero">
 
-  <h1>Voice to text,<br><em>instantly.</em></h1>
+    <!-- App Icon with rings -->
+    <div class="icon-stack">
+      <div class="icon-ring icon-ring-3"></div>
+      <div class="icon-ring icon-ring-2"></div>
+      <div class="icon-ring icon-ring-1"></div>
+      <div class="app-icon">
+        <svg viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="iconGrad" x1="0" y1="0" x2="84" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#5b9cf6"/>
+              <stop offset="45%"  stop-color="#8b6ff8"/>
+              <stop offset="100%" stop-color="#36d4f0"/>
+            </linearGradient>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <path class="wave-path"
+            d="M6 42 Q12 20 18 42 Q24 64 30 42 Q36 20 42 42 Q48 64 54 42 Q60 20 66 42 Q72 64 78 42"
+            stroke="url(#iconGrad)" stroke-width="4" stroke-linecap="round" fill="none" filter="url(#glow)" opacity="0.95"/>
+          <path
+            d="M6 42 Q13 28 20 42 Q27 56 34 42 Q41 28 48 42 Q55 56 62 42 Q69 28 76 42"
+            stroke="url(#iconGrad)" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.25"/>
+        </svg>
+      </div>
+    </div>
 
-  <p class="subtitle">
-    Frespr lives in your menu bar. Hold a key, speak, release —
-    your words appear wherever your cursor is.
-  </p>
+    <div class="pill">
+      <div class="pill-dot"></div>
+      Free & open source · macOS 14+
+    </div>
 
-  <div class="actions">
-    <a class="btn-primary" href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Download for Mac
-    </a>
-    <a class="btn-secondary" href="https://github.com/salah-saleh/frespr">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      View on GitHub
-    </a>
-  </div>
+    <h1>Voice to text,<br><em>instantly.</em></h1>
 
-  <!-- Animated waveform banner -->
-  <div class="waveform-banner">
-    <div class="waveform-label"><span>●</span> &nbsp;Awaiting voice…</div>
-    <div class="waveform-bars" id="bars"></div>
-  </div>
+    <p class="subtitle">
+      Frespr lives in your menu bar. Hold a key, speak, release —
+      your words appear wherever your cursor is.
+    </p>
+
+    <div class="actions">
+      <a class="btn-primary" href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download for Mac
+      </a>
+      <a class="btn-secondary" href="https://github.com/salah-saleh/frespr">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+
+    <!-- Demo overlay mockup -->
+    <div class="demo-wrap">
+      <div class="demo-glow"></div>
+      <div class="demo-overlay">
+        <div class="demo-header">
+          <div class="demo-mic">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="5" y="1" width="6" height="9" rx="3" stroke="#36d4f0" stroke-width="1.5"/>
+              <path d="M3 8c0 2.76 2.24 5 5 5s5-2.24 5-5M8 13v2" stroke="#36d4f0" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="demo-status">Recording</div>
+          <div class="demo-timer" id="timer">0:04</div>
+        </div>
+        <div class="demo-waveform" id="demo-bars"></div>
+        <div class="demo-transcript" id="transcript">
+          Schedule a team sync for Thursday at 3pm<span class="cursor"></span>
+        </div>
+        <div class="demo-footer">
+          <kbd>Right ⌥</kbd>
+          <span class="demo-hint">Release to inject</span>
+          <span class="demo-tag">✦ Clean up</span>
+        </div>
+      </div>
+    </div>
+
+  </section>
 
   <!-- Features -->
+  <div class="section-header">
+    <div class="section-label">Everything you need</div>
+    <div class="section-title">Designed to <em>disappear</em></div>
+  </div>
+
   <div class="features">
     <div class="feature">
-      <div class="feature-icon">🎙</div>
+      <div class="feature-icon fi-cyan">🎙</div>
       <h3>Hold to record</h3>
-      <p>Hold Right Option, speak, release. No clicking, no mode switching.</p>
+      <p>Hold your hotkey, speak, release. Text at your cursor instantly — no clicking, no app switching.</p>
     </div>
     <div class="feature">
-      <div class="feature-icon">⚡️</div>
-      <h3>Powered by Gemini</h3>
-      <p>Live transcription via Google's Gemini Live API. Fast and accurate.</p>
+      <div class="feature-icon fi-blue">⚡️</div>
+      <h3>Gemini Live API</h3>
+      <p>Streams audio in real time for fast, accurate transcription with a live word-by-word overlay.</p>
     </div>
     <div class="feature">
-      <div class="feature-icon">✨</div>
+      <div class="feature-icon fi-purple">✨</div>
       <h3>Post-processing</h3>
-      <p>Optionally clean up, summarize, or apply a custom prompt to your text.</p>
+      <p>Clean up, summarize, or apply a custom prompt automatically after every dictation.</p>
     </div>
     <div class="feature">
-      <div class="feature-icon">🔒</div>
+      <div class="feature-icon fi-pink">⌥</div>
+      <h3>5 hotkey choices</h3>
+      <p>Right ⌥, Left ⌥, Fn/Globe, Right ⌘, Ctrl+Option. Pick whatever fits your hands.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon fi-blue">📋</div>
+      <h3>History & re-inject</h3>
+      <p>Last 20 transcriptions in the menu bar. Click any entry to re-inject it anywhere.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon fi-cyan">🔇</div>
+      <h3>Silence detection</h3>
+      <p>Auto-stops after configurable silence — no accidental all-day microphone sessions.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon fi-purple">🔒</div>
       <h3>Your key, your data</h3>
-      <p>Bring your own Gemini API key. Nothing stored or sent to third parties.</p>
+      <p>Bring your own Gemini API key. Audio goes directly to Google — zero third-party servers.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon fi-pink">🛠</div>
+      <h3>Open source</h3>
+      <p>AGPLv3, no Xcode needed. Build with Swift CLI tools in one command.</p>
     </div>
   </div>
 
-  <!-- Install -->
-  <div class="install">
-    <h2>Getting Started</h2>
-    <ol>
-      <li>Download and open <code>Frespr.pkg</code></li>
-      <li>If blocked by Gatekeeper, run:<br>
-        <code>xattr -dr com.apple.quarantine /Applications/Frespr.app</code>
-      </li>
-      <li>Add your <a href="https://aistudio.google.com/apikey" style="color:var(--accent-1)">Gemini API key</a> in Settings</li>
-      <li>Hold <kbd>Right ⌥</kbd> and speak</li>
-    </ol>
+  <!-- Getting Started -->
+  <div class="section-header">
+    <div class="section-label">Setup</div>
+    <div class="section-title">Up in <em>60 seconds</em></div>
+  </div>
+
+  <div class="setup-wrap">
+    <div class="setup-card">
+      <div class="setup-title">Getting Started</div>
+      <div class="setup-steps">
+        <div class="setup-step">
+          <div class="step-num">1</div>
+          <div class="step-body">Download and open <code>Frespr.pkg</code></div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            If Gatekeeper blocks the app, run:<br>
+            <code>xattr -dr com.apple.quarantine /Applications/Frespr.app</code>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            Add your <a href="https://aistudio.google.com/apikey">Gemini API key</a> in Settings <kbd>⌘,</kbd>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">4</div>
+          <div class="step-body">Hold <kbd>Right ⌥</kbd> and speak</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <footer>
     <a href="https://github.com/salah-saleh/frespr">GitHub</a>
     <span class="dot">·</span>
-    Free &amp; open source
+    AGPLv3
     <span class="dot">·</span>
     macOS 14+
+    <span class="dot">·</span>
+    Free forever
   </footer>
 
   <script>
-    // Generate animated waveform bars
-    const container = document.getElementById('bars');
-    const count = 60;
-    for (let i = 0; i < count; i++) {
+    // Demo waveform bars
+    const demoContainer = document.getElementById('demo-bars');
+    for (let i = 0; i < 80; i++) {
       const bar = document.createElement('div');
-      bar.className = 'bar';
-      const h = Math.random() * 28 + 6;
-      const d = (Math.random() * 0.6 + 0.4).toFixed(2);
-      const delay = (Math.random() * 1.2).toFixed(2);
-      bar.style.cssText = `--h:${h}px; --d:${d}s; animation-delay:-${delay}s; height:${h}px;`;
-      container.appendChild(bar);
+      bar.className = 'demo-bar';
+      const h = Math.random() * 26 + 4;
+      const d = (Math.random() * 0.5 + 0.3).toFixed(2);
+      const delay = (Math.random() * 1.0).toFixed(2);
+      bar.style.cssText = `height:${h}px; --d:${d}s; animation-delay:-${delay}s;`;
+      demoContainer.appendChild(bar);
     }
+
+    // Demo timer
+    let seconds = 4;
+    const timerEl = document.getElementById('timer');
+    setInterval(() => {
+      seconds++;
+      if (seconds >= 60) seconds = 0;
+      timerEl.textContent = `0:${String(seconds).padStart(2,'0')}`;
+    }, 1000);
+
+    // Typewriter transcript demo
+    const phrases = [
+      "Schedule a team sync for Thursday at 3pm",
+      "Add unit tests for the auth module",
+      "Email Jake about the design review",
+      "Pick up groceries on the way home",
+      "Note: refactor the config parser next sprint",
+    ];
+    const el = document.getElementById('transcript');
+    let phraseIdx = 0;
+    let charIdx = phrases[0].length;
+    let deleting = false;
+
+    function typeStep() {
+      const phrase = phrases[phraseIdx];
+      if (!deleting) {
+        charIdx++;
+        if (charIdx > phrase.length) {
+          deleting = true;
+          setTimeout(typeStep, 2200);
+          return;
+        }
+      } else {
+        charIdx--;
+        if (charIdx <= 0) {
+          deleting = false;
+          phraseIdx = (phraseIdx + 1) % phrases.length;
+          charIdx = 0;
+          setTimeout(typeStep, 300);
+          return;
+        }
+      }
+      el.innerHTML = phrases[phraseIdx].slice(0, charIdx) + '<span class="cursor"></span>';
+      setTimeout(typeStep, deleting ? 28 : 55);
+    }
+
+    setTimeout(typeStep, 2400);
   </script>
 
 </body>
