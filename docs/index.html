@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frespr — Voice to Text for Mac</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d0d0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1e1e22;
+      border: 1px solid #2a2a30;
+      border-radius: 99px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 32px;
+    }
+
+    .pill span { color: #f0f0f0; }
+
+    h1 {
+      font-size: clamp(40px, 8vw, 72px);
+      font-weight: 700;
+      letter-spacing: -2px;
+      line-height: 1.05;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #e05252, #e07a52);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: #888;
+      text-align: center;
+      max-width: 480px;
+      line-height: 1.6;
+      margin-bottom: 40px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 64px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #f0f0f0;
+      color: #0d0d0f;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: 99px;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-primary:hover { background: #ffffff; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      color: #888;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 14px 24px;
+      border-radius: 99px;
+      border: 1px solid #2a2a30;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .btn-secondary:hover { color: #f0f0f0; border-color: #555; }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      max-width: 720px;
+      width: 100%;
+      margin-bottom: 64px;
+    }
+
+    .feature {
+      background: #1a1a1e;
+      border: 1px solid #2a2a30;
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .feature h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .feature p {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    .install {
+      background: #1a1a1e;
+      border: 1px solid #2a2a30;
+      border-radius: 16px;
+      padding: 24px 28px;
+      max-width: 560px;
+      width: 100%;
+      margin-bottom: 64px;
+    }
+
+    .install h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+    }
+
+    .install ol {
+      padding-left: 20px;
+      color: #ccc;
+      font-size: 14px;
+      line-height: 2;
+    }
+
+    .install code {
+      background: #0d0d0f;
+      border: 1px solid #2a2a30;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-family: "SF Mono", Monaco, monospace;
+      font-size: 12px;
+      color: #e05252;
+    }
+
+    footer {
+      color: #444;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    footer a { color: #666; text-decoration: none; }
+    footer a:hover { color: #aaa; }
+  </style>
+</head>
+<body>
+
+  <div class="pill">
+    ⌥ Hold Right Option to record &nbsp;·&nbsp; <span>macOS 14+</span>
+  </div>
+
+  <h1>Voice to text,<br><em>instantly.</em></h1>
+
+  <p class="subtitle">
+    Frespr lives in your menu bar. Hold a key, speak, release —
+    your words appear wherever your cursor is.
+  </p>
+
+  <div class="actions">
+    <a class="btn-primary" href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">
+      &#8659; &nbsp;Download for Mac
+    </a>
+    <a class="btn-secondary" href="https://github.com/salah-saleh/frespr">
+      View on GitHub
+    </a>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🎙</div>
+      <h3>Hold to record</h3>
+      <p>Hold Right Option, speak, release. No clicking, no mode switching.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⚡️</div>
+      <h3>Powered by Gemini</h3>
+      <p>Live transcription via Google's Gemini Live API. Fast and accurate.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">✨</div>
+      <h3>Post-processing</h3>
+      <p>Optionally clean up, summarize, or apply a custom prompt to your text.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔒</div>
+      <h3>Your key, your data</h3>
+      <p>Bring your own Gemini API key. Nothing stored or sent to third parties.</p>
+    </div>
+  </div>
+
+  <div class="install">
+    <h2>Getting Started</h2>
+    <ol>
+      <li>Download and open <code>Frespr.pkg</code></li>
+      <li>If blocked by Gatekeeper, run:<br>
+        <code>xattr -dr com.apple.quarantine /Applications/Frespr.app</code>
+      </li>
+      <li>Add your <a href="https://aistudio.google.com/apikey" style="color:#e05252">Gemini API key</a> in Settings</li>
+      <li>Hold <kbd style="background:#2a2a30;padding:1px 6px;border-radius:4px;font-size:12px">Right ⌥</kbd> and speak</li>
+    </ol>
+  </div>
+
+  <footer>
+    <a href="https://github.com/salah-saleh/frespr">GitHub</a> &nbsp;·&nbsp;
+    Free and open source
+  </footer>
+
+</body>
+</html>

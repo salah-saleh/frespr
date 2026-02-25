@@ -40,11 +40,20 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.silenceTimeoutSeconds) }
     }
 
+    var hotKeyOption: HotKeyOption {
+        get {
+            let raw = defaults.string(forKey: Keys.hotKeyOption) ?? HotKeyOption.rightOption.rawValue
+            return HotKeyOption.from(rawValue: raw)
+        }
+        set { defaults.set(newValue.rawValue, forKey: Keys.hotKeyOption) }
+    }
+
     private init() {
         defaults.register(defaults: [
             Keys.copyToClipboard: false,
             Keys.silenceDetectionEnabled: true,
-            Keys.silenceTimeoutSeconds: 15
+            Keys.silenceTimeoutSeconds: 15,
+            Keys.hotKeyOption: HotKeyOption.rightOption.rawValue
         ])
     }
 
@@ -55,6 +64,7 @@ final class AppSettings {
         static let copyToClipboard           = "copyToClipboard"
         static let silenceDetectionEnabled   = "silenceDetectionEnabled"
         static let silenceTimeoutSeconds     = "silenceTimeoutSeconds"
+        static let hotKeyOption              = "hotKeyOption"
     }
 }
 

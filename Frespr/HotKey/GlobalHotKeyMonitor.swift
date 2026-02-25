@@ -6,19 +6,19 @@ final class GlobalHotKeyMonitor {
     var onKeyUp: (() -> Void)?
     var onPermissionNeeded: (() -> Void)?
 
+    /// The hotkey to watch. Changing this takes effect on the next restart().
+    var option: HotKeyOption = AppSettings.shared.hotKeyOption
+
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var retryTimer: Timer?
     private var keyDownTime: Date?
-    private var isKeyDown = false
+    fileprivate var isKeyDown = false
 
-    // Minimum ms the key must be held before a release registers.
-    // Prevents the OS's own flagsChanged follow-up event from being
-    // treated as a key-up immediately after key-down.
     private let minHoldMs: Double = 150
 
     func start() {
-        dbg("start()")
+        dbg("start() option=\(option.rawValue)")
         attemptStart()
     }
 
@@ -59,9 +59,7 @@ final class GlobalHotKeyMonitor {
         retryTimer?.invalidate()
         retryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
-            let trusted = AXIsProcessTrusted()
-            dbg("retry tick AX=\(trusted)")
-            if trusted {
+            if AXIsProcessTrusted() {
                 self.retryTimer?.invalidate()
                 self.retryTimer = nil
                 self.attemptStart()
@@ -88,43 +86,27 @@ final class GlobalHotKeyMonitor {
         tearDownTap()
     }
 
-    fileprivate func handleCGEvent(_ event: CGEvent) {
-        let kc = event.getIntegerValueField(.keyboardEventKeycode)
-        let flags = event.flags
-        dbg("flagsChanged keyCode=\(kc) flags=\(String(format:"0x%x", flags.rawValue))")
+    func restart() {
+        stop()
+        start()
+    }
 
-        // keyCode 61 = Right Option only (58 = Left Option, excluded)
-        guard kc == 61 else { return }
-
-        // Option is down when maskAlternate is set with no other modifiers
-        let optionDown = flags.contains(.maskAlternate)
-            && !flags.contains(.maskCommand)
-            && !flags.contains(.maskControl)
-            && !flags.contains(.maskShift)
-
-        dbg("Option kc=\(kc) down=\(optionDown) isKeyDown=\(isKeyDown)")
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            if optionDown && !self.isKeyDown {
-                // Key pressed
-                self.isKeyDown = true
-                self.keyDownTime = Date()
-                dbg("→ key down, firing onKeyDown")
-                self.onKeyDown?()
-
-            } else if !optionDown && self.isKeyDown {
-                // Key released — always reset state, only fire onKeyUp if held long enough
-                let held = self.keyDownTime.map { Date().timeIntervalSince($0) * 1000 } ?? 999
-                self.isKeyDown = false
-                self.keyDownTime = nil
-                if held >= self.minHoldMs {
-                    dbg("→ key up after \(Int(held))ms, firing onKeyUp")
-                    self.onKeyUp?()
-                } else {
-                    dbg("→ key up ignored (held only \(Int(held))ms < \(Int(self.minHoldMs))ms)")
-                }
+    // Called from the tap callback (runs on main runloop).
+    fileprivate func fireKeyEvent(isDown: Bool) {
+        if isDown && !self.isKeyDown {
+            self.isKeyDown = true
+            self.keyDownTime = Date()
+            dbg("→ key down")
+            self.onKeyDown?()
+        } else if !isDown && self.isKeyDown {
+            let held = self.keyDownTime.map { Date().timeIntervalSince($0) * 1000 } ?? 999
+            self.isKeyDown = false
+            self.keyDownTime = nil
+            if held >= self.minHoldMs {
+                dbg("→ key up after \(Int(held))ms")
+                self.onKeyUp?()
+            } else {
+                dbg("→ key up ignored (\(Int(held))ms < \(Int(self.minHoldMs))ms)")
             }
         }
     }
@@ -132,11 +114,53 @@ final class GlobalHotKeyMonitor {
     deinit { stop() }
 }
 
-private let globalHotKeyCallback: CGEventTapCallBack = { _, _, event, userInfo in
+private let globalHotKeyCallback: CGEventTapCallBack = { _, type, event, userInfo in
     guard let userInfo else { return Unmanaged.passRetained(event) }
-    Unmanaged<GlobalHotKeyMonitor>
-        .fromOpaque(userInfo)
-        .takeUnretainedValue()
-        .handleCGEvent(event)
+    let monitor = Unmanaged<GlobalHotKeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+
+    guard type == .flagsChanged else { return Unmanaged.passRetained(event) }
+
+    let kc    = Int(event.getIntegerValueField(.keyboardEventKeycode))
+    let flags = event.flags
+
+    switch monitor.option {
+
+    case .rightOption:
+        guard kc == 61 else { break }
+        let down = flags.contains(.maskAlternate)
+            && !flags.contains(.maskCommand) && !flags.contains(.maskControl) && !flags.contains(.maskShift)
+        monitor.fireKeyEvent(isDown: down)
+
+    case .leftOption:
+        guard kc == 58 else { break }
+        let down = flags.contains(.maskAlternate)
+            && !flags.contains(.maskCommand) && !flags.contains(.maskControl) && !flags.contains(.maskShift)
+        monitor.fireKeyEvent(isDown: down)
+
+    case .fn:
+        guard kc == 63 else { break }
+        let down = flags.contains(.maskSecondaryFn)
+            && !flags.contains(.maskAlternate) && !flags.contains(.maskCommand)
+            && !flags.contains(.maskControl) && !flags.contains(.maskShift)
+        monitor.fireKeyEvent(isDown: down)
+
+    case .rightCommand:
+        guard kc == 54 else { break }
+        let down = flags.contains(.maskCommand)
+            && !flags.contains(.maskAlternate) && !flags.contains(.maskControl) && !flags.contains(.maskShift)
+        monitor.fireKeyEvent(isDown: down)
+
+    case .ctrlOption:
+        // Fire when both Ctrl and Option are held together (either pressed second triggers down).
+        let bothDown = flags.contains(.maskControl) && flags.contains(.maskAlternate)
+            && !flags.contains(.maskCommand) && !flags.contains(.maskShift)
+        if bothDown {
+            monitor.fireKeyEvent(isDown: true)
+        } else if monitor.isKeyDown {
+            // Either modifier released → key up
+            monitor.fireKeyEvent(isDown: false)
+        }
+    }
+
     return Unmanaged.passRetained(event)
 }

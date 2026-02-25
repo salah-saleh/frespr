@@ -30,6 +30,7 @@ compile() {
     "$SRC/Gemini/GeminiPostProcessor.swift" \
     "$SRC/Audio/AudioCaptureEngine.swift" \
     "$SRC/TextInjection/TextInjector.swift" \
+    "$SRC/HotKey/HotKeyOption.swift" \
     "$SRC/HotKey/GlobalHotKeyMonitor.swift" \
     "$SRC/MenuBar/MenuBarController.swift" \
     "$SRC/UI/OverlayView.swift" \

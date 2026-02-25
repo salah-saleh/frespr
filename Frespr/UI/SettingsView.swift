@@ -108,7 +108,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 560)
+        .frame(width: 420, height: 640)
         .task {
             await refreshPermissions()
         }
@@ -119,6 +119,8 @@ struct SettingsView: View {
         axStatus = permissionManager.accessibilityAuthorized
     }
 }
+
+// MARK: - Permission Row
 
 private struct PermissionRow: View {
     let label: String

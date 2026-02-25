@@ -29,9 +29,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 4. Hotkey
         let monitor = GlobalHotKeyMonitor()
+        monitor.option = AppSettings.shared.hotKeyOption
         monitor.onKeyDown = { Task { @MainActor [weak self] in self?.coordinator.handleHotkeyPress() } }
         monitor.start()
         hotKeyMonitor = monitor
+
+        NotificationCenter.default.addObserver(
+            forName: .hotKeyChanged,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.hotKeyMonitor?.option = AppSettings.shared.hotKeyOption
+                self.hotKeyMonitor?.restart()
+            }
+        }
 
         // 5. Global Escape key to cancel recording
         installEscapeMonitor()

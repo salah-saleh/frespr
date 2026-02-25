@@ -6,6 +6,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private let apiKeyField    = NSTextField()
     private let apiKeyStatus   = NSImageView()
+    private let apiKeyEditBtn  = NSButton()
+    private var apiKeyIsEditing = false
     private let silenceCheck     = NSButton(checkboxWithTitle: "Auto-stop after silence", target: nil, action: nil)
     private let silenceTimeout   = NSTextField()
     private let silenceTimeoutStepper = NSStepper()
@@ -15,13 +17,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
     private let ppCustomRadio    = NSButton(radioButtonWithTitle: PostProcessingMode.custom.displayName,    target: nil, action: nil)
     private let ppCustomField    = NSTextField()
+    private let hotKeyPopup      = NSPopUpButton()
     private let clipboardCheck   = NSButton(checkboxWithTitle: "Copy transcript to clipboard", target: nil, action: nil)
     private let micRow           = PermissionRowView(label: "Microphone")
     private let axRow            = PermissionRowView(label: "Accessibility (text injection)")
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 660),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 760),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -83,17 +86,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         apiKeyField.cell?.usesSingleLineMode = true
         apiKeyField.cell?.isScrollable = true
         apiKeyField.target = self
-        apiKeyField.action = #selector(apiKeyChanged)
+        apiKeyField.action = #selector(apiKeySavePressed)
 
-        // API key status icon (check / x) next to field
-        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        apiKeyStatus.image = NSImage(systemSymbolName: "circle", accessibilityDescription: nil)?
-            .withSymbolConfiguration(cfg)
         apiKeyStatus.translatesAutoresizingMaskIntoConstraints = false
         apiKeyStatus.widthAnchor.constraint(equalToConstant: 18).isActive = true
         apiKeyStatus.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let keyRow = NSStackView(views: [apiKeyField, apiKeyStatus])
+        apiKeyEditBtn.bezelStyle = .rounded
+        apiKeyEditBtn.controlSize = .small
+        apiKeyEditBtn.target = self
+        apiKeyEditBtn.action = #selector(apiKeyEditPressed)
+
+        let keyRow = NSStackView(views: [apiKeyField, apiKeyStatus, apiKeyEditBtn])
         keyRow.orientation = .horizontal
         keyRow.spacing = 8
         keyRow.translatesAutoresizingMaskIntoConstraints = false
@@ -137,6 +141,23 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         silenceRow.orientation = .horizontal
         silenceRow.spacing = 6
         stack.addArrangedSubview(row(silenceRow))
+
+        stack.addArrangedSubview(divider())
+
+        // ── Hotkey ───────────────────────────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Hotkey"), top: 12))
+
+        for option in HotKeyOption.allCases {
+            hotKeyPopup.addItem(withTitle: option.label)
+        }
+        hotKeyPopup.target = self; hotKeyPopup.action = #selector(hotKeyChanged)
+        stack.addArrangedSubview(row(hotKeyPopup))
+
+        let hotKeyNote = NSTextField(wrappingLabelWithString: "Hold to record, release to inject. Fn/Globe requires System Settings → Keyboard → \"Press Globe key\" → \"Do Nothing\".")
+        hotKeyNote.font = .systemFont(ofSize: 11)
+        hotKeyNote.textColor = .secondaryLabelColor
+        hotKeyNote.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(hotKeyNote))
 
         stack.addArrangedSubview(divider())
 
@@ -233,8 +254,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func loadValues() {
         let s = AppSettings.shared
-        apiKeyField.stringValue = s.geminiAPIKey
-        updateAPIKeyStatus(key: s.geminiAPIKey)
+        let key = s.geminiAPIKey
+        apiKeyField.stringValue = key
+        updateAPIKeyStatus(key: key)
+        setAPIKeyEditing(key.isEmpty)  // start in edit mode only if no key yet
         silenceCheck.state = s.silenceDetectionEnabled ? .on : .off
         silenceTimeout.integerValue = s.silenceTimeoutSeconds
         silenceTimeoutStepper.integerValue = s.silenceTimeoutSeconds
@@ -242,6 +265,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         updatePPRadios(mode: s.postProcessingMode)
         ppCustomField.stringValue = s.customPostProcessingPrompt
         updatePPCustomFieldVisibility()
+        let currentOption = s.hotKeyOption
+        if let idx = HotKeyOption.allCases.firstIndex(of: currentOption) {
+            hotKeyPopup.selectItem(at: idx)
+        }
         clipboardCheck.state = s.copyToClipboard ? .on : .off
     }
 
@@ -276,6 +303,30 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    private func setAPIKeyEditing(_ editing: Bool) {
+        apiKeyIsEditing = editing
+        apiKeyField.isEditable = editing
+        apiKeyField.isSelectable = editing
+        apiKeyField.backgroundColor = editing ? .textBackgroundColor : .controlBackgroundColor
+
+        if editing {
+            // Show the raw key while editing
+            apiKeyField.stringValue = AppSettings.shared.geminiAPIKey
+            apiKeyEditBtn.title = "Save"
+        } else {
+            // Show masked key when locked
+            let key = AppSettings.shared.geminiAPIKey
+            apiKeyField.stringValue = key.isEmpty ? "" : mask(key)
+            apiKeyEditBtn.title = "Edit"
+        }
+    }
+
+    private func mask(_ key: String) -> String {
+        guard key.count > 8 else { return String(repeating: "•", count: key.count) }
+        let suffix = String(key.suffix(4))
+        return String(repeating: "•", count: key.count - 4) + suffix
+    }
+
     private func refreshPermissions() {
         let pm = PermissionManager.shared
         micRow.setGranted(pm.microphoneAuthorized) { [weak self] in
@@ -292,10 +343,24 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Actions
 
-    @objc private func apiKeyChanged() {
-        let key = apiKeyField.stringValue
-        AppSettings.shared.geminiAPIKey = key
-        updateAPIKeyStatus(key: key)
+    @objc private func apiKeyEditPressed() {
+        if apiKeyIsEditing {
+            // Save
+            let key = apiKeyField.stringValue
+            AppSettings.shared.geminiAPIKey = key
+            updateAPIKeyStatus(key: key)
+            setAPIKeyEditing(false)
+            window?.makeFirstResponder(nil)
+        } else {
+            // Enter edit mode
+            setAPIKeyEditing(true)
+            window?.makeFirstResponder(apiKeyField)
+        }
+    }
+
+    @objc private func apiKeySavePressed() {
+        // Return key in field triggers save
+        if apiKeyIsEditing { apiKeyEditPressed() }
     }
 
     @objc private func silenceCheckChanged() {
@@ -334,6 +399,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
     }
 
+    @objc private func hotKeyChanged() {
+        let idx = hotKeyPopup.indexOfSelectedItem
+        let option = HotKeyOption.allCases[idx]
+        AppSettings.shared.hotKeyOption = option
+        NotificationCenter.default.post(name: .hotKeyChanged, object: nil)
+    }
+
     @objc private func clipboardCheckChanged() {
         AppSettings.shared.copyToClipboard = clipboardCheck.state == .on
     }
@@ -348,7 +420,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
         DispatchQueue.main.async { [weak self] in
             guard let self, let w = self.window else { return }
-            w.makeFirstResponder(self.apiKeyField)
+            // Only focus API key field if in edit mode (no key set yet)
+            if self.apiKeyIsEditing { w.makeFirstResponder(self.apiKeyField) }
         }
     }
 
@@ -376,7 +449,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
-        AppSettings.shared.geminiAPIKey = apiKeyField.stringValue
+        if apiKeyIsEditing {
+            let key = apiKeyField.stringValue
+            AppSettings.shared.geminiAPIKey = key
+        }
         AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
         NSApp.mainMenu = nil
         NSApp.setActivationPolicy(.accessory)
