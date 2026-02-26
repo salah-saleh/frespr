@@ -126,6 +126,28 @@
       background: rgba(255,255,255,0.04);
     }
 
+    .nav-links .nav-coffee {
+      background: rgba(251,191,36,0.08);
+      border: 1px solid rgba(251,191,36,0.2);
+      color: #fbbf24;
+      animation: coffeeFlash 2.2s ease-in-out infinite;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .nav-links .nav-coffee:hover {
+      background: rgba(251,191,36,0.22);
+      border-color: rgba(251,191,36,0.65);
+      color: #fcd34d;
+      animation: none;
+      box-shadow: 0 0 18px 4px rgba(251,191,36,0.3);
+    }
+
+    .nav-links .nav-coffee:hover .bmc-icon {
+      animation: coffeeWiggle 0.4s ease-in-out;
+    }
+
     .nav-links .nav-download {
       background: rgba(91,156,246,0.1);
       border: 1px solid rgba(91,156,246,0.2);
@@ -285,8 +307,51 @@
       text-align: center;
       max-width: 480px;
       line-height: 1.7;
-      margin-bottom: 44px;
+      margin-bottom: 36px;
       font-weight: 400;
+    }
+
+    /* ── Stats row (stars + downloads) ── */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-2);
+      border-radius: 99px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      cursor: default;
+    }
+
+    a.stat-badge {
+      cursor: pointer;
+    }
+
+    a.stat-badge:hover {
+      border-color: var(--border-3);
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .stat-badge svg { flex-shrink: 0; opacity: 0.85; }
+
+    .stat-badge .stat-num {
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
     }
 
     /* ── Buttons ── */
@@ -345,6 +410,67 @@
       border-color: var(--border-3);
       background: rgba(255,255,255,0.06);
     }
+
+    /* ── Floating hero cards ── */
+    .hero-cards-container {
+      position: relative;
+      width: 100%;
+      max-width: 920px;
+      height: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero-float-card {
+      position: absolute;
+      background: rgba(12, 18, 32, 0.88);
+      border: 1px solid var(--border-2);
+      border-radius: 14px;
+      padding: 12px 16px;
+      backdrop-filter: blur(16px);
+      box-shadow:
+        0 0 0 1px rgba(91,156,246,0.08),
+        0 16px 48px rgba(0,0,0,0.55);
+      opacity: 0;
+      transform: scale(0.82);
+      transition: opacity 0.55s cubic-bezier(0.2, 0.75, 0.28, 0.9),
+                  transform 0.55s cubic-bezier(0.2, 0.75, 0.28, 0.9);
+      min-width: 160px;
+    }
+
+    .hero-float-card.card-visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .hfc-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .hfc-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hfc-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .hfc-dot-green { background: #34d399; box-shadow: 0 0 7px #34d399; }
+    .hfc-dot-blue  { background: var(--accent-1); box-shadow: 0 0 7px var(--accent-1); }
+    .hfc-dot-purple{ background: var(--accent-2); box-shadow: 0 0 7px var(--accent-2); }
 
     /* ── Demo overlay mock ── */
     .demo-wrap {
@@ -738,6 +864,341 @@
       color: var(--text-dim);
     }
 
+    /* ── Comparison table ── */
+    .comparison-wrap {
+      max-width: 920px;
+      width: 100%;
+      margin-bottom: 90px;
+      position: relative;
+      z-index: 1;
+      overflow-x: auto;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 600px;
+    }
+
+    .comparison-table thead th {
+      padding: 0 0 20px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: -0.1px;
+    }
+
+    .comparison-table thead th:first-child {
+      text-align: left;
+      color: var(--text-muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .ct-frespr {
+      color: var(--accent-1) !important;
+    }
+
+    .ct-frespr-head {
+      position: relative;
+    }
+
+    .ct-frespr-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(91,156,246,0.08);
+      border: 1px solid rgba(91,156,246,0.2);
+      border-radius: 10px;
+      padding: 8px 18px;
+    }
+
+    .comparison-table tbody tr td {
+      padding: 15px 12px;
+      font-size: 13.5px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .comparison-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .comparison-table tbody tr td:first-child {
+      font-weight: 600;
+      color: var(--text-dim);
+      font-size: 13px;
+      white-space: nowrap;
+      padding-left: 0;
+    }
+
+    .comparison-table tbody tr td:nth-child(2) {
+      background: rgba(91,156,246,0.03);
+      border-left: 1px solid rgba(91,156,246,0.12);
+      border-right: 1px solid rgba(91,156,246,0.12);
+    }
+
+    .comparison-table tbody tr:first-child td:nth-child(2) {
+      border-top: 1px solid rgba(91,156,246,0.12);
+      border-radius: 10px 10px 0 0;
+    }
+
+    .comparison-table tbody tr:last-child td:nth-child(2) {
+      border-bottom: 1px solid rgba(91,156,246,0.12) !important;
+      border-radius: 0 0 10px 10px;
+    }
+
+    .ct-yes {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .ct-no {
+      color: var(--text-muted);
+    }
+
+    .ct-partial {
+      color: #fbbf24;
+      font-weight: 500;
+    }
+
+    /* ── FAQ Accordion ── */
+    .faq-wrap {
+      max-width: 680px;
+      width: 100%;
+      margin-bottom: 90px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .faq-item:first-child {
+      border-top: 1px solid var(--border);
+    }
+
+    .faq-question {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      letter-spacing: -0.2px;
+      transition: color 0.15s;
+    }
+
+    .faq-question:hover { color: var(--accent-1); }
+
+    .faq-chevron {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.25s, background 0.15s;
+    }
+
+    .faq-item.open .faq-chevron {
+      transform: rotate(180deg);
+      background: rgba(91,156,246,0.1);
+      border-color: rgba(91,156,246,0.25);
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .faq-item.open .faq-answer {
+      max-height: 500px;
+    }
+
+    .faq-answer-inner {
+      padding: 0 0 20px;
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.75;
+    }
+
+    .faq-answer-inner strong {
+      color: var(--text);
+    }
+
+    /* ── About section ── */
+    .about-wrap {
+      max-width: 680px;
+      width: 100%;
+      margin-bottom: 90px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .about-card {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 24px;
+      padding: 36px;
+      display: flex;
+      gap: 28px;
+      align-items: flex-start;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .about-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(91,156,246,0.4), rgba(139,111,248,0.4), transparent);
+    }
+
+    .about-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      object-fit: cover;
+      border: 2px solid var(--border-2);
+      box-shadow: 0 0 0 1px rgba(91,156,246,0.2), 0 8px 24px rgba(0,0,0,0.4);
+      background: linear-gradient(135deg, #0e2248, #161f30);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      overflow: hidden;
+    }
+
+    .about-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .about-body { flex: 1; min-width: 0; }
+
+    .about-name {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .about-role {
+      font-size: 13px;
+      color: var(--accent-1);
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+
+    .about-bio {
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.75;
+      margin-bottom: 18px;
+    }
+
+    .about-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .about-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 6px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 8px;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    .about-link:hover {
+      color: var(--text);
+      border-color: var(--border-3);
+      background: var(--surface-3);
+    }
+
+    .about-link svg { opacity: 0.8; }
+
+    .bmc-icon {
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .bmc-icon img {
+      display: block;
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+
+    @keyframes coffeeFlash {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); border-color: rgba(251,191,36,0.2); background: rgba(251,191,36,0.08); }
+      40%       { box-shadow: 0 0 14px 4px rgba(251,191,36,0.28); border-color: rgba(251,191,36,0.6); background: rgba(251,191,36,0.18); }
+      60%       { box-shadow: 0 0 14px 4px rgba(251,191,36,0.28); border-color: rgba(251,191,36,0.6); background: rgba(251,191,36,0.18); }
+    }
+
+    @keyframes coffeeWiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-14deg); }
+      75% { transform: rotate(14deg); }
+    }
+
+    .about-coffee {
+      background: rgba(251,191,36,0.08);
+      border-color: rgba(251,191,36,0.2);
+      color: #fbbf24;
+      animation: coffeeFlash 2.2s ease-in-out infinite;
+    }
+
+    .about-coffee:hover {
+      background: rgba(251,191,36,0.22) !important;
+      border-color: rgba(251,191,36,0.65) !important;
+      color: #fcd34d !important;
+      animation: none !important;
+      box-shadow: 0 0 18px 4px rgba(251,191,36,0.3) !important;
+    }
+
+    .about-coffee:hover .bmc-icon {
+      animation: coffeeWiggle 0.4s ease-in-out;
+    }
+
+    @media (max-width: 520px) {
+      .about-card { flex-direction: column; align-items: center; text-align: center; }
+      .about-links { justify-content: center; }
+    }
+
     /* ── Footer ── */
     footer {
       color: var(--text-muted);
@@ -778,7 +1239,9 @@
       Frespr
     </a>
     <div class="nav-links">
+      <a href="#faq">FAQ</a>
       <a href="https://github.com/salah-saleh/frespr">GitHub</a>
+      <a href="https://buymeacoffee.com/egcyclist" target="_blank" rel="noopener" class="nav-coffee"><span class="bmc-icon"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt=""/></span> Buy me a coffee</a>
       <a href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg" class="nav-download">Download</a>
     </div>
   </nav>
@@ -825,6 +1288,25 @@
       Frespr lives in your menu bar. Hold a key, speak, release —
       your words appear wherever your cursor is.
     </p>
+
+    <!-- Stats badges -->
+    <div class="stats-row">
+      <a class="stat-badge" href="https://github.com/salah-saleh/frespr" target="_blank" rel="noopener" id="badge-stars">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1l1.85 3.75L14 5.5l-3 2.92.71 4.12L8 10.5l-3.71 1.95.71-4.12L2 5.5l4.15-.75L8 1z"
+                stroke="#fbbf24" stroke-width="1.4" fill="rgba(251,191,36,0.15)" stroke-linejoin="round"/>
+        </svg>
+        <span class="stat-num" id="stars-count">—</span>
+        <span>stars on GitHub</span>
+      </a>
+      <a class="stat-badge" href="https://github.com/salah-saleh/frespr/releases" target="_blank" rel="noopener" id="badge-downloads">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="#34d399" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="stat-num" id="dl-count">—</span>
+        <span>downloads</span>
+      </a>
+    </div>
 
     <div class="actions">
       <a class="btn-primary" href="https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg">
@@ -910,7 +1392,7 @@
     <div class="feature">
       <div class="feature-icon fi-pink">🛠</div>
       <h3>Open source</h3>
-      <p>AGPLv3, no Xcode needed. Build with Swift CLI tools in one command.</p>
+      <p>AGPL-3.0, no Xcode needed. Build with Swift CLI tools in one command.</p>
     </div>
   </div>
 
@@ -949,10 +1431,262 @@
     </div>
   </div>
 
+  <!-- Comparison table -->
+  <div id="faq" class="section-header">
+    <div class="section-label">How it stacks up</div>
+    <div class="section-title">Frespr vs. <em>the alternatives</em></div>
+  </div>
+
+  <div class="comparison-wrap">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th class="ct-frespr-head">
+            <div class="ct-frespr-inner">
+              <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+                <path d="M2 10 Q4 6 6 10 Q8 14 10 10 Q12 6 14 10 Q16 14 18 10"
+                      stroke="#5b9cf6" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <span class="ct-frespr">Frespr</span>
+            </div>
+          </th>
+          <th>Wispr Flow</th>
+          <th>Superwhisper</th>
+          <th>Willow Voice</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Price</td>
+          <td><span class="ct-yes">Free forever</span></td>
+          <td><span class="ct-partial">$18/mo</span></td>
+          <td><span class="ct-partial">$12/mo</span></td>
+          <td><span class="ct-partial">From $9/mo</span></td>
+        </tr>
+        <tr>
+          <td>Open source</td>
+          <td><span class="ct-yes">✓ AGPL-3.0</span></td>
+          <td><span class="ct-no">✗ Proprietary</span></td>
+          <td><span class="ct-no">✗ Proprietary</span></td>
+          <td><span class="ct-no">✗ Proprietary</span></td>
+        </tr>
+        <tr>
+          <td>Platform</td>
+          <td>macOS 14+</td>
+          <td>Mac, Windows, iOS</td>
+          <td>Mac, iOS</td>
+          <td>Mac, Windows, iOS</td>
+        </tr>
+        <tr>
+          <td>Transcription engine</td>
+          <td><span class="ct-yes">Gemini Live (real-time)</span></td>
+          <td>Proprietary AI</td>
+          <td>Whisper / cloud</td>
+          <td>Cloud ASR</td>
+        </tr>
+        <tr>
+          <td>Works in any app</td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td>AI post-processing</td>
+          <td><span class="ct-yes">✓ Clean up / summarize / custom</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-partial">Limited</span></td>
+          <td><span class="ct-partial">Limited</span></td>
+        </tr>
+        <tr>
+          <td>Bring your own API key</td>
+          <td><span class="ct-yes">✓ Required (free tier available)</span></td>
+          <td><span class="ct-no">✗ Vendor-managed</span></td>
+          <td><span class="ct-no">✗ Vendor-managed</span></td>
+          <td><span class="ct-no">✗ Vendor-managed</span></td>
+        </tr>
+        <tr>
+          <td>Audio sent to third-party servers</td>
+          <td><span class="ct-yes">✗ Direct to Google only</span></td>
+          <td><span class="ct-no">✓ Via Wispr servers</span></td>
+          <td><span class="ct-no">✓ Via Superwhisper servers</span></td>
+          <td><span class="ct-no">✓ Via Willow servers</span></td>
+        </tr>
+        <tr>
+          <td>Live streaming overlay</td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-partial">Partial</span></td>
+        </tr>
+        <tr>
+          <td>Transcription history</td>
+          <td><span class="ct-yes">✓ Last 20, re-inject</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-yes">✓</span></td>
+          <td><span class="ct-partial">Limited</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section-header">
+    <div class="section-label">Common questions</div>
+    <div class="section-title">FAQ</div>
+  </div>
+
+  <div class="faq-wrap">
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Is Frespr really free? What's the catch?
+        <span class="faq-chevron">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="faq-answer">
+        <div class="faq-answer-inner">
+          No catch. Frespr is <strong>completely free and open source</strong> (AGPL-3.0 licence). You bring your own
+          <a href="https://aistudio.google.com/apikey" style="color:var(--accent-1)">Gemini API key</a>,
+          which has a generous free tier (plenty for personal use). Google charges fractions of a cent per minute of audio
+          beyond that. Frespr itself will never charge you.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        How is Frespr different from Wispr Flow?
+        <span class="faq-chevron">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="faq-answer">
+        <div class="faq-answer-inner">
+          Both do push-to-talk voice dictation in any app. The key differences:
+          <br><br>
+          <strong>Price:</strong> Wispr Flow costs ~$18/month. Frespr is free.<br>
+          <strong>Privacy:</strong> Wispr Flow routes your audio through their servers. Frespr sends audio <em>directly</em> from your Mac to Google's Gemini API — no intermediary.<br>
+          <strong>Source:</strong> Frespr is open source; you can audit and build it yourself.<br>
+          <strong>Platform:</strong> Wispr Flow also supports Windows and iOS. Frespr is macOS-only for now.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        How does Frespr compare to Superwhisper?
+        <span class="faq-chevron">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="faq-answer">
+        <div class="faq-answer-inner">
+          Superwhisper uses OpenAI Whisper (batch processing after you stop speaking). Frespr uses
+          <strong>Gemini Live</strong>, which streams transcription <em>while you speak</em> — you see words appear in
+          real time in the overlay. Superwhisper's paid plans start at ~$12/month. Frespr is free.
+          Both are macOS-native and work system-wide.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        How does Frespr compare to Willow Voice?
+        <span class="faq-chevron">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="faq-answer">
+        <div class="faq-answer-inner">
+          Willow Voice is a subscription product (from $9/month) that manages its own AI infrastructure.
+          Frespr skips the middleman entirely — your audio goes from your microphone directly to Google's
+          servers via your own API key. Willow supports more platforms (Mac, Windows, iOS, Chrome extension).
+          Frespr currently supports macOS only but is <strong>100% free and open source</strong>.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Is my audio / data private?
+        <span class="faq-chevron">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="faq-answer">
+        <div class="faq-answer-inner">
+          Frespr never touches your audio. The app captures audio locally and sends it <strong>directly to Google's
+          Gemini API</strong> using <em>your</em> API key. No Frespr server exists. You can verify this by reading the
+          source code — it's all in <code>GeminiLiveService.swift</code>.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Does it need Xcode or a developer account?
+        <span class="faq-chevron">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="faq-answer">
+        <div class="faq-answer-inner">
+          No. The pre-built <code>Frespr.pkg</code> installs directly to <code>/Applications</code>.
+          If Gatekeeper shows a warning, run:<br><br>
+          <code>xattr -dr com.apple.quarantine /Applications/Frespr.app</code><br><br>
+          To build from source you only need Xcode Command Line Tools (<code>xcode-select --install</code>).
+          No Apple Developer account, no signing certificate, no Xcode IDE required.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- About -->
+  <div class="section-header">
+    <div class="section-label">The builder</div>
+    <div class="section-title">Built by a <em>real person</em></div>
+  </div>
+
+  <div class="about-wrap">
+    <div class="about-card">
+      <div class="about-avatar" id="about-avatar">
+        <img src="me-j.jpg" alt="Salaheldin Saleh">
+      </div>
+      <div class="about-body">
+        <div class="about-name">Salaheldin Saleh</div>
+        <div class="about-role">Software Engineer · Builder</div>
+        <div class="about-bio">
+          I built Frespr because I was tired of paying $18/month for voice dictation.
+          Gemini Live is incredible — real-time streaming transcription, generous free tier,
+          and no middleman. Frespr is my attempt to make that accessible to everyone, for free.
+        </div>
+        <div class="about-links">
+          <a class="about-link about-coffee" href="https://buymeacoffee.com/egcyclist" target="_blank" rel="noopener">
+            <span class="bmc-icon"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt=""/></span> Buy me a coffee
+          </a>
+          <a class="about-link" href="https://www.linkedin.com/in/salaheldinsaleh/" target="_blank" rel="noopener">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/>
+            </svg>
+            LinkedIn
+          </a>
+          <a class="about-link" href="https://github.com/salah-saleh" target="_blank" rel="noopener">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <a href="https://github.com/salah-saleh/frespr">GitHub</a>
     <span class="dot">·</span>
-    AGPLv3
+    AGPL-3.0
     <span class="dot">·</span>
     macOS 14+
     <span class="dot">·</span>
@@ -960,7 +1694,7 @@
   </footer>
 
   <script>
-    // Demo waveform bars
+    // ── Demo waveform bars ──────────────────────────────────────────
     const demoContainer = document.getElementById('demo-bars');
     for (let i = 0; i < 80; i++) {
       const bar = document.createElement('div');
@@ -972,7 +1706,7 @@
       demoContainer.appendChild(bar);
     }
 
-    // Demo timer
+    // ── Demo timer ──────────────────────────────────────────────────
     let seconds = 4;
     const timerEl = document.getElementById('timer');
     setInterval(() => {
@@ -981,7 +1715,7 @@
       timerEl.textContent = `0:${String(seconds).padStart(2,'0')}`;
     }, 1000);
 
-    // Typewriter transcript demo
+    // ── Typewriter transcript demo ──────────────────────────────────
     const phrases = [
       "Schedule a team sync for Thursday at 3pm",
       "Add unit tests for the auth module",
@@ -1018,6 +1752,47 @@
     }
 
     setTimeout(typeStep, 2400);
+
+    // ── GitHub stats badges ─────────────────────────────────────────
+    async function loadGitHubStats() {
+      try {
+        // Stars
+        const repoRes = await fetch('https://api.github.com/repos/salah-saleh/frespr');
+        if (repoRes.ok) {
+          const repo = await repoRes.json();
+          const stars = repo.stargazers_count;
+          document.getElementById('stars-count').textContent =
+            stars >= 1000 ? (stars / 1000).toFixed(1) + 'k' : stars;
+        }
+      } catch (_) {}
+
+      try {
+        // Downloads (sum all release assets)
+        const relRes = await fetch('https://api.github.com/repos/salah-saleh/frespr/releases');
+        if (relRes.ok) {
+          const releases = await relRes.json();
+          let total = 0;
+          for (const rel of releases) {
+            for (const asset of rel.assets) {
+              total += asset.download_count;
+            }
+          }
+          document.getElementById('dl-count').textContent =
+            total >= 1000 ? (total / 1000).toFixed(1) + 'k' : total || '—';
+        }
+      } catch (_) {}
+    }
+
+    loadGitHubStats();
+
+    // ── FAQ accordion ────────────────────────────────────────────────
+    function toggleFaq(btn) {
+      const item = btn.closest('.faq-item');
+      const wasOpen = item.classList.contains('open');
+      // close all
+      document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    }
   </script>
 
 </body>

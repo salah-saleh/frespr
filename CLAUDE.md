@@ -141,7 +141,7 @@ The landing page highlights the app's key features. Update the `.features` grid 
 5. **History & re-inject** — last 20 transcriptions in menu bar, click to re-inject
 6. **Silence detection** — auto-stop after configurable silence timeout
 7. **Your key, your data** — direct audio to Google, no third-party servers
-8. **Open source** — MIT, build with Swift CLI tools, no Xcode
+8. **Open source** — AGPL-3.0, build with Swift CLI tools, no Xcode
 
 ## Known Gotchas
 
