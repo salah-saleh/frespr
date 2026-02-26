@@ -13,7 +13,9 @@ final class OverlayWindow: NSPanel {
     init(viewModel: OverlayViewModel) {
         self.viewModel = viewModel
 
-        let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let mouseLocation = NSEvent.mouseLocation
+        let activeScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) ?? NSScreen.main
+        let screenRect = activeScreen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let w = OverlayWindow.width
         let h = OverlayWindow.minHeight
         let x = screenRect.midX - w / 2
@@ -32,7 +34,7 @@ final class OverlayWindow: NSPanel {
         self.backgroundColor = .clear
         self.hasShadow = true
         self.isMovableByWindowBackground = false
-        self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        self.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]
         self.hidesOnDeactivate = false
         self.becomesKeyOnlyIfNeeded = true
         self.alphaValue = 0
@@ -100,7 +102,9 @@ final class OverlayWindow: NSPanel {
     // MARK: - Private
 
     private func reposition() {
-        guard let screen = NSScreen.main else { return }
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) ?? NSScreen.main
+        guard let screen else { return }
         let screenRect = screen.visibleFrame
         let w = OverlayWindow.width
         let h = max(OverlayWindow.minHeight, min(OverlayWindow.maxHeight, self.frame.height))

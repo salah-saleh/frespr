@@ -52,8 +52,9 @@ final class AppSettings {
         defaults.register(defaults: [
             Keys.copyToClipboard: false,
             Keys.silenceDetectionEnabled: true,
-            Keys.silenceTimeoutSeconds: 15,
-            Keys.hotKeyOption: HotKeyOption.rightOption.rawValue
+            Keys.silenceTimeoutSeconds: 10,
+            Keys.hotKeyOption: HotKeyOption.fn.rawValue,
+            Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue
         ])
     }
 
