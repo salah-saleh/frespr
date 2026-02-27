@@ -4,6 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Frespr — Voice to Text for Mac</title>
+  <meta name="description" content="Free, open-source voice-to-text dictation for macOS. Hold a hotkey, speak, and text appears at your cursor — powered by Gemini Live real-time streaming. No subscription, bring your own API key.">
+  <meta name="author" content="Salaheldin Saleh">
+  <link rel="canonical" href="https://frespr.com/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://frespr.com/">
+  <meta property="og:title" content="Frespr — Free Voice to Text for Mac">
+  <meta property="og:description" content="Free, open-source macOS dictation app. Hold a hotkey, speak, release — text appears instantly at your cursor. Powered by Gemini Live. No subscription required.">
+  <meta property="og:image" content="https://frespr.com/og-image.png">
+  <meta property="og:site_name" content="Frespr">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Frespr — Free Voice to Text for Mac">
+  <meta name="twitter:description" content="Free, open-source macOS dictation app. Hold a hotkey, speak, release — text appears instantly at your cursor. Powered by Gemini Live.">
+  <meta name="twitter:image" content="https://frespr.com/og-image.png">
+
+  <!-- Theme -->
+  <meta name="theme-color" content="#060a10">
+
+  <!-- DNS prefetch -->
+  <link rel="dns-prefetch" href="//api.github.com">
+  <link rel="dns-prefetch" href="//cdn.buymeacoffee.com">
+
   <link rel="icon" type="image/png" href="icons/icon_32x32@2x.png" sizes="64x64">
   <link rel="icon" type="image/png" href="icons/icon_32x32.png" sizes="32x32">
   <link rel="icon" type="image/png" href="icons/icon_16x16.png" sizes="16x16">
@@ -651,6 +676,10 @@
       opacity: 0.8;
     }
 
+    h2.section-title {
+      margin: 0;
+    }
+
     .section-title {
       font-size: clamp(26px, 4vw, 36px);
       font-weight: 700;
@@ -1259,6 +1288,34 @@
     footer a:hover { color: var(--text-dim); }
     footer .dot { color: var(--border-2); }
   </style>
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Frespr",
+    "operatingSystem": "macOS 14+",
+    "applicationCategory": "UtilitiesApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Free, open-source voice-to-text dictation for macOS. Hold a hotkey, speak, and text appears at your cursor — powered by Gemini Live real-time streaming.",
+    "url": "https://frespr.com/",
+    "downloadUrl": "https://github.com/salah-saleh/frespr/releases/latest/download/Frespr.pkg",
+    "softwareVersion": "1.1.0",
+    "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+    "author": {
+      "@type": "Person",
+      "name": "Salaheldin Saleh",
+      "url": "https://github.com/salah-saleh"
+    },
+    "codeRepository": "https://github.com/salah-saleh/frespr",
+    "keywords": ["voice to text", "dictation", "macOS", "speech recognition", "Gemini Live", "open source", "free"]
+  }
+  </script>
 </head>
 <body>
 
@@ -1268,7 +1325,7 @@
   <nav>
     <a class="nav-logo" href="#">
       <div class="nav-logo-icon">
-        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
           <path d="M2 10 Q4 6 6 10 Q8 14 10 10 Q12 6 14 10 Q16 14 18 10"
                 stroke="url(#ng)" stroke-width="1.6" stroke-linecap="round"/>
           <defs>
@@ -1299,7 +1356,7 @@
       <div class="icon-ring icon-ring-2"></div>
       <div class="icon-ring icon-ring-1"></div>
       <div class="app-icon">
-        <svg viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <defs>
             <linearGradient id="iconGrad" x1="0" y1="0" x2="84" y2="0" gradientUnits="userSpaceOnUse">
               <stop offset="0%"   stop-color="#5b9cf6"/>
@@ -1381,7 +1438,7 @@
       <div class="demo-overlay">
         <div class="demo-header">
           <div class="demo-mic">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <rect x="5" y="1" width="6" height="9" rx="3" stroke="#36d4f0" stroke-width="1.5"/>
               <path d="M3 8c0 2.76 2.24 5 5 5s5-2.24 5-5M8 13v2" stroke="#36d4f0" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
@@ -1405,8 +1462,8 @@
 
   <!-- Features -->
   <div class="section-header">
-    <div class="section-label">Everything you need</div>
-    <div class="section-title">Designed to <em>disappear</em></div>
+    <p class="section-label">Everything you need</p>
+    <h2 class="section-title">Designed to <em>disappear</em></h2>
   </div>
 
   <div class="features">
@@ -1454,8 +1511,8 @@
 
   <!-- Getting Started -->
   <div class="section-header">
-    <div class="section-label">Setup</div>
-    <div class="section-title">Up in <em>60 seconds</em></div>
+    <p class="section-label">Setup</p>
+    <h2 class="section-title">Up in <em>60 seconds</em></h2>
   </div>
 
   <div class="setup-wrap">
@@ -1488,8 +1545,8 @@
 
   <!-- Comparison table -->
   <div id="faq" class="section-header">
-    <div class="section-label">How it stacks up</div>
-    <div class="section-title">Frespr vs. <em>the alternatives</em></div>
+    <p class="section-label">How it stacks up</p>
+    <h2 class="section-title">Frespr vs. <em>the alternatives</em></h2>
   </div>
 
   <div class="comparison-wrap">
@@ -1595,8 +1652,8 @@
 
   <!-- FAQ -->
   <div class="section-header">
-    <div class="section-label">Common questions</div>
-    <div class="section-title">FAQ</div>
+    <p class="section-label">Common questions</p>
+    <h2 class="section-title">FAQ</h2>
   </div>
 
   <div class="faq-wrap">
@@ -1709,8 +1766,8 @@
 
   <!-- About -->
   <div class="section-header">
-    <div class="section-label">The builder</div>
-    <div class="section-title">Built by a <em>real person</em></div>
+    <p class="section-label">The builder</p>
+    <h2 class="section-title">Built by a <em>real person</em></h2>
   </div>
 
   <div class="about-wrap">
