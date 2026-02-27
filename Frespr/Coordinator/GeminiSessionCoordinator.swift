@@ -269,8 +269,9 @@ final class GeminiSessionCoordinator {
         }
 
         Task { @MainActor in
-            // Post-process if configured (may take up to ~2s for the REST call)
-            let finalText = await self.postProcess(rawText)
+            // Translate first (if enabled), then post-process
+            let translatedText = await self.translate(rawText)
+            let finalText = await self.postProcess(translatedText)
 
             // Save to history log
             TranscriptionLog.shared.add(text: finalText)
@@ -326,6 +327,34 @@ final class GeminiSessionCoordinator {
             return result
         } catch {
             dbg("postProcess error (using raw): \(error.localizedDescription)")
+            return rawText
+        }
+    }
+
+    /// Translates rawText to the configured target language. Returns rawText unchanged
+    /// if translation is disabled, target == source, or an error occurs.
+    private func translate(_ rawText: String) async -> String {
+        guard settings.translationEnabled else { return rawText }
+
+        let source = settings.translationSourceLanguage
+        let target = settings.translationTargetLanguage
+        let apiKey = settings.geminiAPIKey
+        guard !apiKey.isEmpty else { return rawText }
+
+        let sourceHint = source == "Auto-detect" ? "" : " from \(source)"
+        let systemPrompt = "You are a professional translator. Translate the following text\(sourceHint) into \(target). Output only the translated text and nothing else. Do not add explanations, comments, or quotation marks."
+
+        do {
+            dbg("translate → \(target)")
+            let result = try await GeminiPostProcessor.process(
+                rawText: rawText,
+                systemPrompt: systemPrompt,
+                apiKey: apiKey
+            )
+            dbg("translate done: '\(result.prefix(80))'")
+            return result
+        } catch {
+            dbg("translate error (using raw): \(error.localizedDescription)")
             return rawText
         }
     }

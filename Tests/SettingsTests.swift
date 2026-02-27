@@ -71,7 +71,7 @@ private func expectEqual<T: Equatable>(_ a: T, _ b: T, _ msg: String,
 private let settingsKeys = [
     "postProcessingMode", "customPostProcessingPrompt",
     "copyToClipboard", "silenceDetectionEnabled", "silenceTimeoutSeconds",
-    "hotKeyOption"
+    "hotKeyOption", "translationEnabled", "translationSourceLanguage", "translationTargetLanguage"
 ]
 
 private func cleanDefaults() {
@@ -173,9 +173,9 @@ private func runTests() {
     }
 
     suite("AppSettings.silenceTimeoutSeconds") {
-        test("registered default is 15") {
+        test("registered default is 10") {
             cleanDefaults()
-            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 15, "registered default is 15")
+            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 10, "registered default is 10")
         }
         test("read/write arbitrary value") {
             cleanDefaults()
@@ -207,6 +207,66 @@ private func runTests() {
             UserDefaults.standard.set("unknownKey", forKey: "hotKeyOption")
             expectEqual(AppSettings.shared.hotKeyOption, .rightOption, "falls back to .rightOption")
             cleanDefaults()
+        }
+    }
+
+    // ── Translation settings ──────────────────────────────────────────────────
+
+    suite("AppSettings.translationEnabled") {
+        test("registered default is false") {
+            cleanDefaults()
+            expect(!AppSettings.shared.translationEnabled, "registered default is false")
+        }
+        test("read/write true") {
+            cleanDefaults()
+            AppSettings.shared.translationEnabled = true
+            expect(AppSettings.shared.translationEnabled, "persists true")
+        }
+        test("read/write false") {
+            cleanDefaults()
+            AppSettings.shared.translationEnabled = false
+            expect(!AppSettings.shared.translationEnabled, "persists false")
+        }
+    }
+
+    suite("AppSettings.translationSourceLanguage") {
+        test("registered default is Auto-detect") {
+            cleanDefaults()
+            expectEqual(AppSettings.shared.translationSourceLanguage, "Auto-detect", "default is Auto-detect")
+        }
+        test("read/write arbitrary language") {
+            cleanDefaults()
+            AppSettings.shared.translationSourceLanguage = "French"
+            expectEqual(AppSettings.shared.translationSourceLanguage, "French", "persists French")
+        }
+    }
+
+    suite("AppSettings.translationTargetLanguage") {
+        test("registered default is English") {
+            cleanDefaults()
+            expectEqual(AppSettings.shared.translationTargetLanguage, "English", "default is English")
+        }
+        test("read/write arbitrary language") {
+            cleanDefaults()
+            AppSettings.shared.translationTargetLanguage = "Spanish"
+            expectEqual(AppSettings.shared.translationTargetLanguage, "Spanish", "persists Spanish")
+        }
+    }
+
+    suite("kSupportedLanguages") {
+        test("non-empty list") {
+            expect(!kSupportedLanguages.isEmpty, "language list is non-empty")
+        }
+        test("contains English") {
+            expect(kSupportedLanguages.contains("English"), "English is in the list")
+        }
+        test("contains Spanish") {
+            expect(kSupportedLanguages.contains("Spanish"), "Spanish is in the list")
+        }
+        test("all entries are non-empty strings") {
+            for lang in kSupportedLanguages {
+                expect(!lang.isEmpty, "'\(lang)' is non-empty")
+            }
         }
     }
 

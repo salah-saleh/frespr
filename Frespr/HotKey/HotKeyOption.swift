@@ -24,5 +24,6 @@ enum HotKeyOption: String, CaseIterable {
 }
 
 extension Notification.Name {
-    static let hotKeyChanged = Notification.Name("FresprHotKeyChanged")
+    static let hotKeyChanged         = Notification.Name("FresprHotKeyChanged")
+    static let translationSettingsChanged = Notification.Name("FresprTranslationSettingsChanged")
 }

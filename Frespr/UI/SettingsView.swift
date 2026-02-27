@@ -11,6 +11,9 @@ struct SettingsView: View {
     @State private var apiKeyVisible = false
     @State private var silenceEnabled: Bool = AppSettings.shared.silenceDetectionEnabled
     @State private var silenceTimeout: Int = AppSettings.shared.silenceTimeoutSeconds
+    @State private var translationEnabled: Bool = AppSettings.shared.translationEnabled
+    @State private var translationSource: String = AppSettings.shared.translationSourceLanguage
+    @State private var translationTarget: String = AppSettings.shared.translationTargetLanguage
 
     var body: some View {
         Form {
@@ -72,6 +75,41 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Translation
+            Section {
+                Toggle("Translate transcription", isOn: $translationEnabled)
+                    .onChange(of: translationEnabled) { _, new in
+                        AppSettings.shared.translationEnabled = new
+                    }
+
+                Picker("Speak in", selection: $translationSource) {
+                    Text("Auto-detect").tag("Auto-detect")
+                    Divider()
+                    ForEach(kSupportedLanguages, id: \.self) { lang in
+                        Text(lang).tag(lang)
+                    }
+                }
+                .disabled(!translationEnabled)
+                .onChange(of: translationSource) { _, new in
+                    AppSettings.shared.translationSourceLanguage = new
+                }
+
+                Picker("Translate to", selection: $translationTarget) {
+                    ForEach(kSupportedLanguages, id: \.self) { lang in
+                        Text(lang).tag(lang)
+                    }
+                }
+                .disabled(!translationEnabled)
+                .onChange(of: translationTarget) { _, new in
+                    AppSettings.shared.translationTargetLanguage = new
+                }
+            } header: {
+                Text("Translation")
+            } footer: {
+                Text("Transcribed text is translated before being injected.")
+                    .foregroundStyle(.secondary)
+            }
+
             // Output
             Section {
                 Toggle("Copy transcript to clipboard", isOn: Binding(
@@ -108,8 +146,15 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 640)
+        .frame(width: 420, height: 720)
         .task {
+            // Re-sync local state in case Settings was opened before with different values
+            apiKey = AppSettings.shared.geminiAPIKey
+            silenceEnabled = AppSettings.shared.silenceDetectionEnabled
+            silenceTimeout = AppSettings.shared.silenceTimeoutSeconds
+            translationEnabled = AppSettings.shared.translationEnabled
+            translationSource = AppSettings.shared.translationSourceLanguage
+            translationTarget = AppSettings.shared.translationTargetLanguage
             await refreshPermissions()
         }
     }

@@ -49,13 +49,31 @@ final class AppSettings {
         set { defaults.set(newValue.rawValue, forKey: Keys.hotKeyOption) }
     }
 
+    var translationEnabled: Bool {
+        get { defaults.bool(forKey: Keys.translationEnabled) }
+        set { defaults.set(newValue, forKey: Keys.translationEnabled) }
+    }
+
+    var translationSourceLanguage: String {
+        get { defaults.string(forKey: Keys.translationSourceLanguage) ?? "Auto-detect" }
+        set { defaults.set(newValue, forKey: Keys.translationSourceLanguage) }
+    }
+
+    var translationTargetLanguage: String {
+        get { defaults.string(forKey: Keys.translationTargetLanguage) ?? "English" }
+        set { defaults.set(newValue, forKey: Keys.translationTargetLanguage) }
+    }
+
     private init() {
         defaults.register(defaults: [
             Keys.copyToClipboard: false,
             Keys.silenceDetectionEnabled: true,
             Keys.silenceTimeoutSeconds: 10,
             Keys.hotKeyOption: HotKeyOption.rightOption.rawValue,
-            Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue
+            Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue,
+            Keys.translationEnabled: false,
+            Keys.translationSourceLanguage: "Auto-detect",
+            Keys.translationTargetLanguage: "English"
         ])
         // Migrate legacy API key from UserDefaults → Keychain (one-time)
         if let legacy = defaults.string(forKey: Keys.geminiAPIKey), !legacy.isEmpty {
@@ -72,8 +90,47 @@ final class AppSettings {
         static let silenceDetectionEnabled   = "silenceDetectionEnabled"
         static let silenceTimeoutSeconds     = "silenceTimeoutSeconds"
         static let hotKeyOption              = "hotKeyOption"
+        static let translationEnabled        = "translationEnabled"
+        static let translationSourceLanguage = "translationSourceLanguage"
+        static let translationTargetLanguage = "translationTargetLanguage"
     }
 }
+
+// MARK: - Supported translation languages
+
+let kSupportedLanguages: [String] = [
+    "Afrikaans", "Albanian", "Amharic", "Arabic", "Armenian", "Azerbaijani",
+    "Basque", "Belarusian", "Bengali", "Bosnian", "Bulgarian",
+    "Catalan", "Cebuano", "Chinese (Simplified)", "Chinese (Traditional)",
+    "Corsican", "Croatian", "Czech",
+    "Danish", "Dutch",
+    "English", "Esperanto", "Estonian",
+    "Finnish", "French", "Frisian",
+    "Galician", "Georgian", "German", "Greek", "Gujarati",
+    "Haitian Creole", "Hausa", "Hawaiian", "Hebrew", "Hindi", "Hmong", "Hungarian",
+    "Icelandic", "Igbo", "Indonesian", "Irish", "Italian",
+    "Japanese", "Javanese",
+    "Kannada", "Kazakh", "Khmer", "Kinyarwanda", "Korean", "Kurdish", "Kyrgyz",
+    "Lao", "Latin", "Latvian", "Lithuanian", "Luxembourgish",
+    "Macedonian", "Malagasy", "Malay", "Malayalam", "Maltese", "Maori", "Marathi",
+    "Mongolian", "Myanmar (Burmese)",
+    "Nepali", "Norwegian",
+    "Nyanja (Chichewa)",
+    "Odia (Oriya)",
+    "Pashto", "Persian", "Polish", "Portuguese", "Punjabi",
+    "Romanian", "Russian",
+    "Samoan", "Scots Gaelic", "Serbian", "Sesotho", "Shona", "Sindhi",
+    "Sinhala (Sinhalese)", "Slovak", "Slovenian", "Somali", "Spanish",
+    "Sundanese", "Swahili", "Swedish",
+    "Tagalog (Filipino)", "Tajik", "Tamil", "Tatar", "Telugu", "Thai",
+    "Turkish", "Turkmen",
+    "Ukrainian", "Urdu", "Uyghur", "Uzbek",
+    "Vietnamese",
+    "Welsh",
+    "Xhosa",
+    "Yiddish", "Yoruba",
+    "Zulu"
+]
 
 // MARK: - KeychainHelper
 

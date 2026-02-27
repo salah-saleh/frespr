@@ -18,6 +18,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
+        let translationItem = NSMenuItem(title: "Translation", action: nil, keyEquivalent: "")
+        translationItem.submenu = buildTranslationMenu()
+        menu.addItem(translationItem)
+
         let ppItem = NSMenuItem(title: "Post-processing", action: nil, keyEquivalent: "")
         ppItem.submenu = buildPostProcessingMenu()
         menu.addItem(ppItem)
@@ -42,12 +46,36 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        if let translationItem = menu.item(withTitle: "Translation") {
+            translationItem.submenu = buildTranslationMenu()
+        }
         if let ppItem = menu.item(withTitle: "Post-processing") {
             ppItem.submenu = buildPostProcessingMenu()
         }
         if let histItem = menu.item(withTitle: "History") {
             histItem.submenu = buildHistoryMenu()
         }
+    }
+
+    private func buildTranslationMenu() -> NSMenu {
+        let sub = NSMenu()
+        let enabled = AppSettings.shared.translationEnabled
+        let source = AppSettings.shared.translationSourceLanguage
+        let target = AppSettings.shared.translationTargetLanguage
+
+        let offItem = NSMenuItem(title: "Off", action: #selector(setTranslationOff), keyEquivalent: "")
+        offItem.target = self
+        offItem.state = enabled ? .off : .on
+        sub.addItem(offItem)
+
+        let sourceLabel = source == "Auto-detect" ? "Auto" : source
+        let onTitle = "\(sourceLabel) → \(target)"
+        let onItem = NSMenuItem(title: onTitle, action: #selector(setTranslationOn), keyEquivalent: "")
+        onItem.target = self
+        onItem.state = enabled ? .on : .off
+        sub.addItem(onItem)
+
+        return sub
     }
 
     private func buildPostProcessingMenu() -> NSMenu {
@@ -129,6 +157,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func clearHistory() {
         TranscriptionLog.shared.clear()
+    }
+
+    @objc private func setTranslationOff() {
+        AppSettings.shared.translationEnabled = false
+        NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
+    }
+    @objc private func setTranslationOn() {
+        AppSettings.shared.translationEnabled = true
+        NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
     }
 
     @objc private func setMode(_ sender: NSMenuItem) {

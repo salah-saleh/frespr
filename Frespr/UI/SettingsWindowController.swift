@@ -19,12 +19,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let ppCustomField    = NSTextField()
     private let hotKeyPopup      = NSPopUpButton()
     private let clipboardCheck   = NSButton(checkboxWithTitle: "Copy transcript to clipboard", target: nil, action: nil)
+    private let translationCheck = NSButton(checkboxWithTitle: "Translate transcription", target: nil, action: nil)
+    private let translationSourcePopup = NSPopUpButton()
+    private let translationTargetPopup = NSPopUpButton()
     private let micRow           = PermissionRowView(label: "Microphone")
     private let axRow            = PermissionRowView(label: "Accessibility (text injection)")
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 760),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 900),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -198,6 +201,42 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         stack.addArrangedSubview(divider())
 
+        // ── Translation ──────────────────────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Translation"), top: 12))
+
+        translationCheck.target = self; translationCheck.action = #selector(translationCheckChanged)
+        stack.addArrangedSubview(row(translationCheck))
+
+        // "Speak in" row
+        translationSourcePopup.addItem(withTitle: "Auto-detect")
+        translationSourcePopup.menu?.addItem(.separator())
+        for lang in kSupportedLanguages { translationSourcePopup.addItem(withTitle: lang) }
+        translationSourcePopup.target = self; translationSourcePopup.action = #selector(translationSourceChanged)
+
+        let speakInLabel = NSTextField(labelWithString: "Speak in")
+        speakInLabel.font = .systemFont(ofSize: 13)
+        let sourceRow = NSStackView(views: [speakInLabel, translationSourcePopup])
+        sourceRow.orientation = .horizontal; sourceRow.spacing = 10
+        stack.addArrangedSubview(row(sourceRow))
+
+        // "Translate to" row
+        for lang in kSupportedLanguages { translationTargetPopup.addItem(withTitle: lang) }
+        translationTargetPopup.target = self; translationTargetPopup.action = #selector(translationTargetChanged)
+
+        let translateToLabel = NSTextField(labelWithString: "Translate to")
+        translateToLabel.font = .systemFont(ofSize: 13)
+        let targetRow = NSStackView(views: [translateToLabel, translationTargetPopup])
+        targetRow.orientation = .horizontal; targetRow.spacing = 10
+        stack.addArrangedSubview(row(targetRow))
+
+        let transNote = NSTextField(wrappingLabelWithString: "Transcribed audio is translated before being injected. Adds ~1–2 seconds.")
+        transNote.font = .systemFont(ofSize: 11)
+        transNote.textColor = .secondaryLabelColor
+        transNote.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(transNote))
+
+        stack.addArrangedSubview(divider())
+
         // ── Permissions ──────────────────────────────────────────────
         stack.addArrangedSubview(row(sectionHeader("Permissions"), top: 12))
 
@@ -227,6 +266,23 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         stack.addArrangedSubview(spacer)
 
         refreshPermissions()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(externalTranslationChanged),
+            name: .translationSettingsChanged,
+            object: nil
+        )
+    }
+
+    @objc private func externalTranslationChanged() {
+        let s = AppSettings.shared
+        translationCheck.state = s.translationEnabled ? .on : .off
+        translationSourcePopup.selectItem(withTitle: s.translationSourceLanguage)
+        if translationSourcePopup.indexOfSelectedItem < 0 { translationSourcePopup.selectItem(at: 0) }
+        translationTargetPopup.selectItem(withTitle: s.translationTargetLanguage)
+        if translationTargetPopup.indexOfSelectedItem < 0 { translationTargetPopup.selectItem(withTitle: "English") }
+        updateTranslationRowsEnabled()
     }
 
     private func sectionHeader(_ title: String) -> NSTextField {
@@ -274,6 +330,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             hotKeyPopup.selectItem(at: idx)
         }
         clipboardCheck.state = s.copyToClipboard ? .on : .off
+        translationCheck.state = s.translationEnabled ? .on : .off
+        translationSourcePopup.selectItem(withTitle: s.translationSourceLanguage)
+        if translationSourcePopup.indexOfSelectedItem < 0 { translationSourcePopup.selectItem(at: 0) }
+        translationTargetPopup.selectItem(withTitle: s.translationTargetLanguage)
+        if translationTargetPopup.indexOfSelectedItem < 0 { translationTargetPopup.selectItem(withTitle: "English") }
+        updateTranslationRowsEnabled()
     }
 
     private func updateSilenceRowEnabled() {
@@ -288,6 +350,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         ppCleanupRadio.state   = mode == .cleanup   ? .on : .off
         ppSummarizeRadio.state = mode == .summarize ? .on : .off
         ppCustomRadio.state    = mode == .custom    ? .on : .off
+    }
+
+    private func updateTranslationRowsEnabled() {
+        let on = translationCheck.state == .on
+        translationSourcePopup.isEnabled = on
+        translationTargetPopup.isEnabled = on
     }
 
     private func updatePPCustomFieldVisibility() {
@@ -412,6 +480,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func clipboardCheckChanged() {
         AppSettings.shared.copyToClipboard = clipboardCheck.state == .on
+    }
+
+    @objc private func translationCheckChanged() {
+        AppSettings.shared.translationEnabled = translationCheck.state == .on
+        updateTranslationRowsEnabled()
+        NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
+    }
+
+    @objc private func translationSourceChanged() {
+        AppSettings.shared.translationSourceLanguage = translationSourcePopup.titleOfSelectedItem ?? "Auto-detect"
+    }
+
+    @objc private func translationTargetChanged() {
+        AppSettings.shared.translationTargetLanguage = translationTargetPopup.titleOfSelectedItem ?? "English"
     }
 
     // MARK: - Show

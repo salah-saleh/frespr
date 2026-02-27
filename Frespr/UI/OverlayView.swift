@@ -132,7 +132,8 @@ struct OverlayView: View {
             }
 
         case .processing:
-            Text("PROCESSING")
+            let processingLabel = AppSettings.shared.translationEnabled ? "TRANSLATING" : "PROCESSING"
+            Text(processingLabel)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.brand1)
                 .kerning(0.6)
@@ -272,20 +273,65 @@ struct ModeSelectorView: View {
     @State private var isPressed = false
     @State private var isHovered = false
 
+    private var translating: Bool { settings.translationEnabled }
+    private var ppMode: PostProcessingMode { settings.postProcessingMode }
+    private var hasPostProcessing: Bool { ppMode != .none }
+
+    // First word of a language name, so "Chinese (Simplified)" → "Chinese"
+    private var shortTarget: String {
+        settings.translationTargetLanguage
+            .components(separatedBy: " ").first ?? settings.translationTargetLanguage
+    }
+
     var body: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "wand.and.stars")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
-            Text(settings.postProcessingMode.shortLabel)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color(white: isHovered ? 0.9 : 0.7))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            if isHovered {
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Color(white: 0.4))
+        VStack(spacing: 0) {
+            if translating {
+                // Translation row
+                HStack(spacing: 5) {
+                    Image(systemName: "character.bubble")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
+                    Text("→ \(shortTarget)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color(white: isHovered ? 0.9 : 0.65))
+                        .lineLimit(1)
+                }
+
+                if hasPostProcessing {
+                    // Divider between the two rows
+                    Rectangle()
+                        .fill(Color.overlayBdr)
+                        .frame(height: 1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+
+                    // Post-processing row
+                    HStack(spacing: 5) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
+                        Text(ppMode.shortLabel)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(white: isHovered ? 0.9 : 0.65))
+                            .lineLimit(1)
+                    }
+                }
+            } else {
+                // Post-processing only
+                HStack(spacing: 7) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
+                    Text(ppMode.shortLabel)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color(white: isHovered ? 0.9 : 0.7))
+                        .lineLimit(1)
+                    if isHovered {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Color(white: 0.4))
+                    }
+                }
             }
         }
         .padding(.horizontal, 14)
