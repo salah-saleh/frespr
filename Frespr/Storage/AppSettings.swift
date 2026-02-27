@@ -53,7 +53,7 @@ final class AppSettings {
             Keys.copyToClipboard: false,
             Keys.silenceDetectionEnabled: true,
             Keys.silenceTimeoutSeconds: 10,
-            Keys.hotKeyOption: HotKeyOption.fn.rawValue,
+            Keys.hotKeyOption: HotKeyOption.rightOption.rawValue,
             Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue
         ])
     }

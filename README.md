@@ -29,6 +29,13 @@ Native macOS menu bar app for voice-to-text dictation powered by the Gemini Live
 
 Download the latest `Frespr.pkg` from [Releases](../../releases) and double-click to install.
 
+> [!WARNING]
+> **macOS will block the installer** — Frespr is not signed with a paid Apple Developer certificate, so Gatekeeper will show a warning when you open the package.
+>
+> **To bypass it, choose one of:**
+> - Right-click `Frespr.pkg` → **Open** → click **Open** in the dialog
+> - **System Settings → Privacy & Security** → scroll down → **Open Anyway**
+
 Or build from source:
 
 ```bash

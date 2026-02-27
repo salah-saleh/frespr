@@ -1199,6 +1199,50 @@
       .about-links { justify-content: center; }
     }
 
+    /* ── Gatekeeper notice ── */
+    .gatekeeper-notice {
+      max-width: 560px;
+      width: 100%;
+      margin: -56px 0 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .gatekeeper-box {
+      background: rgba(251,191,36,0.06);
+      border: 1px solid rgba(251,191,36,0.28);
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .gk-icon {
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .gk-body {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.65;
+    }
+
+    .gk-body strong {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    .gk-body code {
+      background: rgba(0,0,0,0.35);
+      border-color: rgba(251,191,36,0.2);
+      color: #fcd34d;
+      font-size: 11.5px;
+    }
+
     /* ── Footer ── */
     footer {
       color: var(--text-muted);
@@ -1319,6 +1363,18 @@
       </a>
     </div>
 
+    <!-- Gatekeeper notice -->
+    <div class="gatekeeper-notice">
+      <div class="gatekeeper-box">
+        <div class="gk-icon">⚠️</div>
+        <div class="gk-body">
+          <strong>macOS may block the installer</strong> — since Frespr isn't signed with a paid Apple Developer certificate, Gatekeeper will show a warning. To open it anyway:<br><br>
+          <strong>Option A:</strong> Right-click <code>Frespr.pkg</code> → <strong>Open</strong> → click <strong>Open</strong> in the dialog.<br>
+          <strong>Option B:</strong> Go to <strong>System Settings → Privacy &amp; Security</strong>, scroll down, and click <strong>Open Anyway</strong> next to the blocked item.
+        </div>
+      </div>
+    </div>
+
     <!-- Demo overlay mockup -->
     <div class="demo-wrap">
       <div class="demo-glow"></div>
@@ -1410,11 +1466,10 @@
           <div class="step-num">1</div>
           <div class="step-body">Download and open <code>Frespr.pkg</code></div>
         </div>
-        <div class="setup-step">
-          <div class="step-num">2</div>
+        <div class="setup-step" style="background:rgba(251,191,36,0.04); border-left: 2px solid rgba(251,191,36,0.4); border-bottom-color: rgba(251,191,36,0.12);">
+          <div class="step-num" style="background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.25); color:#fbbf24;">2</div>
           <div class="step-body">
-            If Gatekeeper blocks the app, run:<br>
-            <code>xattr -dr com.apple.quarantine /Applications/Frespr.app</code>
+            <span style="color:#fbbf24; font-weight:600;">macOS will block the installer</span> — right-click <code>Frespr.pkg</code> → <strong>Open</strong> → click <strong>Open</strong>. Or go to <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>.
           </div>
         </div>
         <div class="setup-step">

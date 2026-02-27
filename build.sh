@@ -101,7 +101,7 @@ if [ "$MODE" = "pkg" ]; then
   echo "==> Packaging"
   PAYLOAD="$BUILD/payload"
   mkdir -p "$PAYLOAD"
-  cp -R "$APP" "$PAYLOAD/"
+  ditto "$APP" "$PAYLOAD/Frespr.app"
 
   SCRIPTS="$BUILD/scripts"
   mkdir -p "$SCRIPTS"
@@ -114,8 +114,16 @@ exit 0
 POSTINSTALL
   chmod +x "$SCRIPTS/postinstall"
 
+  # Generate component plist and pin the install location so pkgbuild doesn't
+  # mark the bundle as relocatable. Without this, a fresh install (no existing
+  # /Applications/Frespr.app to "upgrade") silently skips placing the files.
+  COMPONENT_PLIST="$BUILD/components.plist"
+  pkgbuild --analyze --root "$PAYLOAD" "$COMPONENT_PLIST"
+  /usr/libexec/PlistBuddy -c "Set :0:BundleIsRelocatable false" "$COMPONENT_PLIST"
+
   pkgbuild \
     --root "$PAYLOAD" \
+    --component-plist "$COMPONENT_PLIST" \
     --scripts "$SCRIPTS" \
     --install-location /Applications \
     --identifier com.frespr.app \

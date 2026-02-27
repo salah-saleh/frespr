@@ -50,10 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 5. Global Escape key to cancel recording
         installEscapeMonitor()
 
-        // 6. Permissions
-        Task { await PermissionManager.shared.checkAndRequestAll() }
-
-        // 7. Open Settings on first launch if no API key
+        // 6. Open Settings on first launch if no API key
         if AppSettings.shared.geminiAPIKey.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.openSettings()
