@@ -139,7 +139,7 @@ The landing page highlights the app's key features. Update the `.features` grid 
 3. **Post-processing** — cleanup / summarize / custom prompt modes
 4. **Configurable hotkey** — Right ⌥, Left ⌥, Fn/Globe, Right ⌘, Ctrl+Option
 5. **History & re-inject** — last 20 transcriptions in menu bar, click to re-inject
-6. **Silence detection** — auto-stop after configurable silence timeout
+6. **70 languages** — speak in any of the 70 languages Gemini Live supports (English, Spanish, French, Japanese, Arabic, Hindi, and more)
 7. **Your key, your data** — direct audio to Google, no third-party servers
 8. **Open source** — AGPL-3.0, build with Swift CLI tools, no Xcode
 

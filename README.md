@@ -1,6 +1,6 @@
 # Frespr
 
-Native macOS menu bar app for voice-to-text dictation powered by the Gemini Live API. Hold a hotkey to record, release to transcribe — text is injected directly into whatever app you're typing in.
+Native macOS menu bar app for voice-to-text dictation powered by the Gemini Live API. Hold a hotkey to record, release to transcribe — text is injected directly into whatever app you're typing in. Supports **70 languages** out of the box.
 
 <img src="docs/icons/icon_128x128@2x.png" width="128" alt="Frespr app icon">
 
@@ -16,6 +16,7 @@ Native macOS menu bar app for voice-to-text dictation powered by the Gemini Live
 - **Smart text injection** — uses Accessibility API (AXUIElement) with pasteboard+Cmd+V fallback
 - **Free & open source** — AGPLv3 licensed
 - **Audio buffering** — captures audio immediately on keypress while the WebSocket is still connecting, so the first word is never lost
+- **70 languages** — transcribes in any language Gemini Live supports, including English, Spanish, French, German, Japanese, Chinese, Arabic, Hindi, and 62 more
 
 ## Requirements
 
