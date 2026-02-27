@@ -26,6 +26,7 @@
 
 import AppKit
 import Foundation
+import Security
 
 // MARK: - Minimal test harness
 
@@ -65,10 +66,10 @@ private func expectEqual<T: Equatable>(_ a: T, _ b: T, _ msg: String,
     expect(a == b, "\(msg) — expected \(b), got \(a)", file: file, line: line)
 }
 
-// MARK: - UserDefaults cleanup
+// MARK: - Cleanup helpers
 
 private let settingsKeys = [
-    "geminiAPIKey", "postProcessingMode", "customPostProcessingPrompt",
+    "postProcessingMode", "customPostProcessingPrompt",
     "copyToClipboard", "silenceDetectionEnabled", "silenceTimeoutSeconds",
     "hotKeyOption"
 ]
@@ -76,6 +77,16 @@ private let settingsKeys = [
 private func cleanDefaults() {
     for key in settingsKeys { UserDefaults.standard.removeObject(forKey: key) }
     UserDefaults.standard.synchronize()
+    cleanKeychain()
+}
+
+private func cleanKeychain() {
+    let query: [CFString: Any] = [
+        kSecClass:       kSecClassGenericPassword,
+        kSecAttrService: "com.frespr.app",
+        kSecAttrAccount: "geminiAPIKey"
+    ]
+    SecItemDelete(query as CFDictionary)
 }
 
 // MARK: - Tests

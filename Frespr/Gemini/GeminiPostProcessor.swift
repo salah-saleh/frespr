@@ -46,7 +46,7 @@ final class GeminiPostProcessor {
     /// Throws on network error, non-200 response, or empty result.
     /// Callers should catch and fall back to `rawText`.
     static func process(rawText: String, systemPrompt: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: "\(endpoint)?key=\(apiKey)") else {
+        guard let url = URL(string: endpoint) else {
             throw URLError(.badURL)
         }
 
@@ -60,6 +60,7 @@ final class GeminiPostProcessor {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

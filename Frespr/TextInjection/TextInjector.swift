@@ -103,12 +103,15 @@ final class TextInjector {
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        let changeCountAfterWrite = pasteboard.changeCount
 
         // Simulate Cmd+V
         simulateCmdV()
 
-        // Restore clipboard after a short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        // Restore clipboard after paste completes; only if no other app has
+        // written to the pasteboard since us (prevents clobbering a user paste).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard pasteboard.changeCount == changeCountAfterWrite else { return }
             pasteboard.clearContents()
             if let prev = previousContents {
                 pasteboard.setString(prev, forType: .string)

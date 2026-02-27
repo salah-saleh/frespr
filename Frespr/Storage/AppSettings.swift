@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Security
 
 @Observable
 final class AppSettings {
@@ -8,8 +9,8 @@ final class AppSettings {
     private let defaults = UserDefaults.standard
 
     var geminiAPIKey: String {
-        get { defaults.string(forKey: Keys.geminiAPIKey) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.geminiAPIKey) }
+        get { KeychainHelper.read() ?? "" }
+        set { KeychainHelper.write(newValue) }
     }
 
     var postProcessingMode: PostProcessingMode {
@@ -56,6 +57,11 @@ final class AppSettings {
             Keys.hotKeyOption: HotKeyOption.rightOption.rawValue,
             Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue
         ])
+        // Migrate legacy API key from UserDefaults → Keychain (one-time)
+        if let legacy = defaults.string(forKey: Keys.geminiAPIKey), !legacy.isEmpty {
+            KeychainHelper.write(legacy)
+            defaults.removeObject(forKey: Keys.geminiAPIKey)
+        }
     }
 
     private enum Keys {
@@ -66,6 +72,59 @@ final class AppSettings {
         static let silenceDetectionEnabled   = "silenceDetectionEnabled"
         static let silenceTimeoutSeconds     = "silenceTimeoutSeconds"
         static let hotKeyOption              = "hotKeyOption"
+    }
+}
+
+// MARK: - KeychainHelper
+
+private enum KeychainHelper {
+    private static let service = "com.frespr.app"
+    private static let account = "geminiAPIKey"
+
+    static func read() -> String? {
+        let query: [CFString: Any] = [
+            kSecClass:            kSecClassGenericPassword,
+            kSecAttrService:      service,
+            kSecAttrAccount:      account,
+            kSecReturnData:       true,
+            kSecMatchLimit:       kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let str = String(data: data, encoding: .utf8) else { return nil }
+        return str
+    }
+
+    static func write(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return }
+        if read() != nil {
+            let query: [CFString: Any] = [
+                kSecClass:       kSecClassGenericPassword,
+                kSecAttrService: service,
+                kSecAttrAccount: account
+            ]
+            let attrs: [CFString: Any] = [kSecValueData: data]
+            SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
+        } else {
+            let item: [CFString: Any] = [
+                kSecClass:       kSecClassGenericPassword,
+                kSecAttrService: service,
+                kSecAttrAccount: account,
+                kSecValueData:   data
+            ]
+            SecItemAdd(item as CFDictionary, nil)
+        }
+    }
+
+    static func delete() {
+        let query: [CFString: Any] = [
+            kSecClass:       kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }
 

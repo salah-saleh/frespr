@@ -53,7 +53,7 @@ final class GeminiLiveService {
         guard !apiKey.isEmpty else { throw GeminiLiveError.missingAPIKey }
 
         let host = "generativelanguage.googleapis.com"
-        let path = "/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=\(apiKey)"
+        let path = "/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 
         dbg("connecting (raw NWConnection + manual WS) to \(host)")
 
@@ -96,6 +96,7 @@ final class GeminiLiveService {
             "Sec-WebSocket-Key: \(wsKey)",
             "Sec-WebSocket-Version: 13",
             "Origin: https://\(host)",
+            "x-goog-api-key: \(apiKey)",
             "", ""
         ].joined(separator: "\r\n")
 
@@ -212,6 +213,8 @@ final class GeminiLiveService {
             guard data.count >= 10 else { return nil }
             payloadLen = 0
             for i in 0..<8 { payloadLen = payloadLen << 8 | Int(data[2+i]) }
+            // RFC 6455 §5.2: MSB must be 0; negative value means high bit set
+            guard payloadLen >= 0 else { return nil }
             offset = 10
         }
 
