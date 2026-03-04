@@ -266,89 +266,12 @@ private struct WaveformBars: View {
     }
 }
 
-// MARK: - ModeSelectorView
+// MARK: - Pill background
 
-struct ModeSelectorView: View {
-    private var settings = AppSettings.shared
-    @State private var isPressed = false
-    @State private var isHovered = false
-
-    private var translating: Bool { settings.translationEnabled }
-    private var ppMode: PostProcessingMode { settings.postProcessingMode }
-    private var hasPostProcessing: Bool { ppMode != .none }
-
-    // First word of a language name, so "Chinese (Simplified)" → "Chinese"
-    private var shortTarget: String {
-        settings.translationTargetLanguage
-            .components(separatedBy: " ").first ?? settings.translationTargetLanguage
-    }
+private struct PillBackground: View {
+    var isHovered: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            if translating {
-                // Translation row
-                HStack(spacing: 5) {
-                    Image(systemName: "character.bubble")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
-                    Text("→ \(shortTarget)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(white: isHovered ? 0.9 : 0.65))
-                        .lineLimit(1)
-                }
-
-                if hasPostProcessing {
-                    // Divider between the two rows
-                    Rectangle()
-                        .fill(Color.overlayBdr)
-                        .frame(height: 1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-
-                    // Post-processing row
-                    HStack(spacing: 5) {
-                        Image(systemName: "wand.and.stars")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
-                        Text(ppMode.shortLabel)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(white: isHovered ? 0.9 : 0.65))
-                            .lineLimit(1)
-                    }
-                }
-            } else {
-                // Post-processing only
-                HStack(spacing: 7) {
-                    Image(systemName: "wand.and.stars")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
-                    Text(ppMode.shortLabel)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(white: isHovered ? 0.9 : 0.7))
-                        .lineLimit(1)
-                    if isHovered {
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color(white: 0.4))
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, minHeight: 52)
-        .background(modeBackground)
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .onHover { isHovered = $0 }
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: 50, pressing: { pressing in
-            isPressed = pressing
-        }, perform: {
-            settings.postProcessingMode = settings.postProcessingMode.next
-        })
-        .animation(.easeInOut(duration: 0.12), value: isHovered)
-        .animation(.easeInOut(duration: 0.08), value: isPressed)
-    }
-
-    private var modeBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.overlayBg.opacity(0.97))
@@ -367,27 +290,134 @@ struct ModeSelectorView: View {
     }
 }
 
+// MARK: - TranslationPillView
+
+struct TranslationPillView: View {
+    private var settings = AppSettings.shared
+    @State private var isHovered = false
+    @State private var isPressed = false
+
+    private var favs: [String] { settings.translationFavorites }
+    private var translating: Bool { settings.translationEnabled }
+
+    private var shortTarget: String {
+        settings.translationTargetLanguage
+            .components(separatedBy: " ").first ?? settings.translationTargetLanguage
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "character.bubble")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
+            if translating {
+                Text("→ \(shortTarget)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(white: isHovered ? 0.9 : 0.65))
+                    .lineLimit(1)
+            } else {
+                Text("Off")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(white: isHovered ? 0.75 : 0.45))
+                    .lineLimit(1)
+            }
+            if isHovered && favs.count > 1 {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color(white: 0.4))
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .background(PillBackground(isHovered: isHovered))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onHover { isHovered = $0 }
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: 50, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {
+            settings.cycleTranslationFavorite()
+        })
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .animation(.easeInOut(duration: 0.08), value: isPressed)
+    }
+}
+
+// MARK: - PostProcessingPillView
+
+struct PostProcessingPillView: View {
+    private var settings = AppSettings.shared
+    @State private var isHovered = false
+    @State private var isPressed = false
+
+    private var ppMode: PostProcessingMode { settings.postProcessingMode }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isHovered ? AnyShapeStyle(brandGrad) : AnyShapeStyle(Color(white: 0.45)))
+            Text(ppMode.shortLabel)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color(white: isHovered ? 0.9 : 0.7))
+                .lineLimit(1)
+            if isHovered {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color(white: 0.4))
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .background(PillBackground(isHovered: isHovered))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onHover { isHovered = $0 }
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: 50, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {
+            settings.postProcessingMode = settings.postProcessingMode.next
+        })
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .animation(.easeInOut(duration: 0.08), value: isPressed)
+    }
+}
+
 // MARK: - OverlayRootView
 
 struct OverlayRootView: View {
     var viewModel: OverlayViewModel
+    var settings = AppSettings.shared
 
-    private var showModeSelector: Bool {
+    private var showPills: Bool {
         switch viewModel.state {
         case .idle, .error: return false
         case .recording, .processing, .injected: return true
         }
     }
 
+    private var showTranslationPill: Bool {
+        !settings.translationFavorites.isEmpty || settings.translationEnabled
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             OverlayView(viewModel: viewModel)
-            ModeSelectorView()
-                .frame(width: 140)
-                .opacity(showModeSelector ? 1 : 0)
-                .allowsHitTesting(showModeSelector)
-                .animation(.easeInOut(duration: 0.15), value: showModeSelector)
+            if showPills {
+                if showTranslationPill {
+                    VStack(spacing: 6) {
+                        TranslationPillView()
+                        PostProcessingPillView()
+                    }
+                    .frame(width: 130)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                } else {
+                    PostProcessingPillView()
+                        .frame(width: 140)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+            }
         }
+        .animation(.easeInOut(duration: 0.15), value: showPills)
+        .animation(.easeInOut(duration: 0.15), value: showTranslationPill)
         .background(.clear)
     }
 }

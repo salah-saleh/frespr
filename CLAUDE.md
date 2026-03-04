@@ -10,6 +10,7 @@ bash build.sh pkg      # compiles, signs, packages → Frespr.pkg
 open Frespr.pkg        # installs to /Applications
 ```
 
+Very Important, always use bash build.sh (dev mode with claude)
 No Xcode needed — uses `swiftc` from Command Line Tools.
 
 ## Versioning & Releases

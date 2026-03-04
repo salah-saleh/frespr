@@ -22,16 +22,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let translationCheck = NSButton(checkboxWithTitle: "Translate transcription", target: nil, action: nil)
     private let translationSourcePopup = NSPopUpButton()
     private let translationTargetPopup = NSPopUpButton()
+    private let favoritesStack   = NSStackView()   // rebuilt each time favorites change
+    private let addFavPopup      = NSPopUpButton()
     private let micRow           = PermissionRowView(label: "Microphone")
     private let axRow            = PermissionRowView(label: "Accessibility (text injection)")
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 900),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
+        window.minSize = NSSize(width: 440, height: 400)
+        window.maxSize = NSSize(width: 440, height: 1200)
         window.title = "Frespr Settings"
         window.isReleasedWhenClosed = false
         window.appearance = NSAppearance(named: .darkAqua)
@@ -48,21 +52,34 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private func buildUI() {
         guard let content = window?.contentView else { return }
 
-        // Wrap everything in a stack view — easiest way to get correct
-        // sizing without fighting the content view's autoresizing mask.
+        // Scroll view wrapping the entire settings stack
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: content.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+        ])
+
+        // Stack view is the document view inside the scroll view
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 0
         stack.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(stack)
+        scrollView.documentView = stack
 
-        // Pin stack to all four edges of the content view
+        // Pin stack width to scroll view width so it doesn't scroll horizontally
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
         ])
 
         let p: CGFloat = 20
@@ -229,6 +246,31 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         targetRow.orientation = .horizontal; targetRow.spacing = 10
         stack.addArrangedSubview(row(targetRow))
 
+        // "Quick-switch languages" sub-header + favorites management
+        let favsHeader = NSTextField(labelWithString: "Quick-switch languages")
+        favsHeader.font = .systemFont(ofSize: 12, weight: .medium)
+        favsHeader.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(row(favsHeader))
+
+        // Stack of favorite rows (rebuilt dynamically)
+        favoritesStack.orientation = .vertical
+        favoritesStack.alignment = .leading
+        favoritesStack.spacing = 4
+        favoritesStack.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(favoritesStack))
+
+        // "Add" popup
+        addFavPopup.target = self; addFavPopup.action = #selector(addFavorite)
+        addFavPopup.bezelStyle = .rounded
+        addFavPopup.controlSize = .small
+        stack.addArrangedSubview(row(addFavPopup))
+
+        let favsNote = NSTextField(wrappingLabelWithString: "Up to 6 favorites. Click the translation pill during recording to cycle through them.")
+        favsNote.font = .systemFont(ofSize: 11)
+        favsNote.textColor = .tertiaryLabelColor
+        favsNote.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(favsNote))
+
         let transNote = NSTextField(wrappingLabelWithString: "Transcribed audio is translated before being injected. Adds ~1–2 seconds.")
         transNote.font = .systemFont(ofSize: 11)
         transNote.textColor = .secondaryLabelColor
@@ -336,6 +378,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         translationTargetPopup.selectItem(withTitle: s.translationTargetLanguage)
         if translationTargetPopup.indexOfSelectedItem < 0 { translationTargetPopup.selectItem(withTitle: "English") }
         updateTranslationRowsEnabled()
+        loadFavorites()
     }
 
     private func updateSilenceRowEnabled() {
@@ -356,6 +399,45 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let on = translationCheck.state == .on
         translationSourcePopup.isEnabled = on
         translationTargetPopup.isEnabled = on
+    }
+
+    private func loadFavorites() {
+        // Rebuild the favoritesStack rows
+        for v in favoritesStack.arrangedSubviews { favoritesStack.removeArrangedSubview(v); v.removeFromSuperview() }
+
+        let favs = AppSettings.shared.translationFavorites
+        for (i, lang) in favs.enumerated() {
+            let label = NSTextField(labelWithString: lang)
+            label.font = .systemFont(ofSize: 12)
+            let removeBtn = NSButton(title: "−", target: self, action: #selector(removeFavorite(_:)))
+            removeBtn.bezelStyle = .rounded
+            removeBtn.controlSize = .small
+            removeBtn.tag = i
+            let favRow = NSStackView(views: [label, NSView(), removeBtn])  // spacer pushes btn right
+            favRow.orientation = .horizontal
+            favRow.spacing = 6
+            favRow.translatesAutoresizingMaskIntoConstraints = false
+            // Make spacer flexible
+            if let spacer = favRow.arrangedSubviews[1] as NSView? {
+                spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            }
+            favRow.widthAnchor.constraint(equalToConstant: 360).isActive = true
+            favoritesStack.addArrangedSubview(favRow)
+        }
+
+        if favs.isEmpty {
+            let empty = NSTextField(labelWithString: "(none)")
+            empty.font = .systemFont(ofSize: 12)
+            empty.textColor = .tertiaryLabelColor
+            favoritesStack.addArrangedSubview(empty)
+        }
+
+        // Rebuild the Add popup with languages not yet in favorites
+        addFavPopup.removeAllItems()
+        addFavPopup.addItem(withTitle: "＋ Add language…")
+        let available = kSupportedLanguages.filter { !favs.contains($0) }
+        for lang in available { addFavPopup.addItem(withTitle: lang) }
+        addFavPopup.isEnabled = favs.count < 6
     }
 
     private func updatePPCustomFieldVisibility() {
@@ -494,6 +576,24 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func translationTargetChanged() {
         AppSettings.shared.translationTargetLanguage = translationTargetPopup.titleOfSelectedItem ?? "English"
+    }
+
+    @objc private func addFavorite() {
+        guard addFavPopup.indexOfSelectedItem > 0,
+              let lang = addFavPopup.titleOfSelectedItem else { return }
+        var favs = AppSettings.shared.translationFavorites
+        guard !favs.contains(lang), favs.count < 6 else { return }
+        favs.append(lang)
+        AppSettings.shared.translationFavorites = favs
+        loadFavorites()
+    }
+
+    @objc private func removeFavorite(_ sender: NSButton) {
+        var favs = AppSettings.shared.translationFavorites
+        guard sender.tag < favs.count else { return }
+        favs.remove(at: sender.tag)
+        AppSettings.shared.translationFavorites = favs
+        loadFavorites()
     }
 
     // MARK: - Show

@@ -64,6 +64,40 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.translationTargetLanguage) }
     }
 
+    var translationFavorites: [String] {
+        get {
+            guard let data = defaults.data(forKey: Keys.translationFavorites),
+                  let arr = try? JSONDecoder().decode([String].self, from: data)
+            else { return [] }
+            return arr
+        }
+        set {
+            let data = try? JSONEncoder().encode(newValue)
+            defaults.set(data, forKey: Keys.translationFavorites)
+        }
+    }
+
+    /// Cycle: Off → fav[0] → fav[1] → … → Off
+    func cycleTranslationFavorite() {
+        let favs = translationFavorites
+        guard !favs.isEmpty else { return }
+        if !translationEnabled {
+            translationTargetLanguage = favs[0]
+            translationEnabled = true
+        } else if let idx = favs.firstIndex(of: translationTargetLanguage) {
+            let next = idx + 1
+            if next >= favs.count {
+                translationEnabled = false
+            } else {
+                translationTargetLanguage = favs[next]
+            }
+        } else {
+            translationTargetLanguage = favs[0]
+            translationEnabled = true
+        }
+        NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
+    }
+
     private init() {
         defaults.register(defaults: [
             Keys.copyToClipboard: false,
@@ -93,6 +127,7 @@ final class AppSettings {
         static let translationEnabled        = "translationEnabled"
         static let translationSourceLanguage = "translationSourceLanguage"
         static let translationTargetLanguage = "translationTargetLanguage"
+        static let translationFavorites      = "translationFavorites"
     }
 }
 

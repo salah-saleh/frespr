@@ -59,21 +59,35 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func buildTranslationMenu() -> NSMenu {
         let sub = NSMenu()
-        let enabled = AppSettings.shared.translationEnabled
-        let source = AppSettings.shared.translationSourceLanguage
-        let target = AppSettings.shared.translationTargetLanguage
+        let s = AppSettings.shared
+        let enabled = s.translationEnabled
+        let currentTarget = s.translationTargetLanguage
+        let favs = s.translationFavorites
 
         let offItem = NSMenuItem(title: "Off", action: #selector(setTranslationOff), keyEquivalent: "")
         offItem.target = self
         offItem.state = enabled ? .off : .on
         sub.addItem(offItem)
 
-        let sourceLabel = source == "Auto-detect" ? "Auto" : source
-        let onTitle = "\(sourceLabel) → \(target)"
-        let onItem = NSMenuItem(title: onTitle, action: #selector(setTranslationOn), keyEquivalent: "")
-        onItem.target = self
-        onItem.state = enabled ? .on : .off
-        sub.addItem(onItem)
+        if !favs.isEmpty {
+            sub.addItem(.separator())
+            for lang in favs {
+                let source = s.translationSourceLanguage
+                let sourceLabel = source == "Auto-detect" ? "Auto" : source
+                let item = NSMenuItem(title: "\(sourceLabel) → \(lang)",
+                                      action: #selector(setTranslationTarget(_:)),
+                                      keyEquivalent: "")
+                item.target = self
+                item.representedObject = lang
+                item.state = (enabled && currentTarget == lang) ? .on : .off
+                sub.addItem(item)
+            }
+            sub.addItem(.separator())
+        }
+
+        let manageItem = NSMenuItem(title: "Manage favorites…", action: #selector(openSettings), keyEquivalent: "")
+        manageItem.target = self
+        sub.addItem(manageItem)
 
         return sub
     }
@@ -164,6 +178,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
     }
     @objc private func setTranslationOn() {
+        AppSettings.shared.translationEnabled = true
+        NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
+    }
+
+    @objc private func setTranslationTarget(_ sender: NSMenuItem) {
+        guard let lang = sender.representedObject as? String else { return }
+        AppSettings.shared.translationTargetLanguage = lang
         AppSettings.shared.translationEnabled = true
         NotificationCenter.default.post(name: .translationSettingsChanged, object: nil)
     }
