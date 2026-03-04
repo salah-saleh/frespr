@@ -33,6 +33,7 @@ compile() {
     "$SRC/TextInjection/TextInjector.swift" \
     "$SRC/HotKey/HotKeyOption.swift" \
     "$SRC/HotKey/GlobalHotKeyMonitor.swift" \
+    "$SRC/Updater/UpdateChecker.swift" \
     "$SRC/MenuBar/MenuBarController.swift" \
     "$SRC/UI/OverlayView.swift" \
     "$SRC/UI/OverlayWindow.swift" \

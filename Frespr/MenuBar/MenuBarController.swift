@@ -195,6 +195,42 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         AppSettings.shared.postProcessingMode = modes[sender.tag]
     }
 
+    // MARK: - Update Notice
+
+    private var updateMenuItem: NSMenuItem?
+
+    func showUpdateNotice(tag: String, url: URL) {
+        guard let menu = statusItem?.menu else { return }
+        dismissUpdateNotice()
+        let item = NSMenuItem(title: "⬆ Update available: \(tag)", action: #selector(openUpdateURL(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = url
+        let attrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.systemBlue,
+            .font: NSFont.menuFont(ofSize: 0)
+        ]
+        item.attributedTitle = NSAttributedString(string: item.title, attributes: attrs)
+        menu.insertItem(item, at: 0)
+        menu.insertItem(.separator(), at: 1)
+        updateMenuItem = item
+    }
+
+    private func dismissUpdateNotice() {
+        guard let menu = statusItem?.menu, let item = updateMenuItem else { return }
+        if let idx = menu.items.firstIndex(of: item) {
+            if idx + 1 < menu.items.count, menu.items[idx + 1].isSeparatorItem {
+                menu.removeItem(at: idx + 1)
+            }
+            menu.removeItem(at: idx)
+        }
+        updateMenuItem = nil
+    }
+
+    @objc private func openUpdateURL(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     @objc private func openSettings() { onSettings?() }
     @objc private func quit()         { onQuit?() }
 }

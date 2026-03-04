@@ -1287,6 +1287,29 @@
     footer a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
     footer a:hover { color: var(--text-dim); }
     footer .dot { color: var(--border-2); }
+
+    /* ── Version badge ── */
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(139,111,248,0.07);
+      border: 1px solid rgba(139,111,248,0.2);
+      border-radius: 99px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent-2);
+      margin-bottom: 20px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .version-badge:hover {
+      background: rgba(139,111,248,0.14);
+      border-color: rgba(139,111,248,0.35);
+    }
   </style>
 
   <!-- Structured Data -->
@@ -1382,6 +1405,10 @@
       <div class="pill-dot"></div>
       Free & open source · macOS 14+ · 70 languages
     </div>
+
+    <a class="version-badge" id="version-badge" style="display:none" target="_blank" rel="noopener">
+      <span id="version-text"></span>
+    </a>
 
     <h1>Voice to text,<br><em>instantly.</em></h1>
 
@@ -1882,6 +1909,21 @@
           const stars = repo.stargazers_count;
           document.getElementById('stars-count').textContent =
             stars >= 1000 ? (stars / 1000).toFixed(1) + 'k' : stars;
+        }
+      } catch (_) {}
+
+      try {
+        // Latest release version
+        const relLatest = await fetch('https://api.github.com/repos/salah-saleh/frespr/releases/latest');
+        if (relLatest.ok) {
+          const rel = await relLatest.json();
+          const tag = rel.tag_name || '';
+          if (tag) {
+            const badge = document.getElementById('version-badge');
+            document.getElementById('version-text').textContent = tag;
+            badge.href = rel.html_url;
+            badge.style.display = 'inline-flex';
+          }
         }
       } catch (_) {}
 

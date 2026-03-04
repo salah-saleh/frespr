@@ -64,6 +64,14 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.translationTargetLanguage) }
     }
 
+    var lastUpdateCheckDate: Date? {
+        get {
+            let t = defaults.double(forKey: Keys.lastUpdateCheckDate)
+            return t == 0 ? nil : Date(timeIntervalSince1970: t)
+        }
+        set { defaults.set(newValue?.timeIntervalSince1970 ?? 0, forKey: Keys.lastUpdateCheckDate) }
+    }
+
     var translationFavorites: [String] {
         get {
             guard let data = defaults.data(forKey: Keys.translationFavorites),
@@ -128,6 +136,7 @@ final class AppSettings {
         static let translationSourceLanguage = "translationSourceLanguage"
         static let translationTargetLanguage = "translationTargetLanguage"
         static let translationFavorites      = "translationFavorites"
+        static let lastUpdateCheckDate       = "lastUpdateCheckDate"
     }
 }
 

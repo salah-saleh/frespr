@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyMonitor: GlobalHotKeyMonitor?
     private var escapeMonitor: Any?
     private var settingsWC: SettingsWindowController?
+    private var updateChecker: UpdateChecker?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -50,7 +51,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 5. Global Escape key to cancel recording
         installEscapeMonitor()
 
-        // 6. Open Settings on first launch if no API key
+        // 6. Update check
+        let checker = UpdateChecker()
+        checker.onUpdateAvailable = { [weak self] tag, url in
+            self?.menuBar.showUpdateNotice(tag: tag, url: url)
+        }
+        checker.checkIfNeeded()
+        updateChecker = checker
+
+        // 7. Open Settings on first launch if no API key
         if AppSettings.shared.geminiAPIKey.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.openSettings()
