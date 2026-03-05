@@ -118,7 +118,11 @@ final class OverlayWindow: NSPanel {
         let currentFrame = self.frame
         // Keep the bottom edge fixed; grow upward.
         let newFrame = NSRect(x: currentFrame.minX, y: currentFrame.minY, width: OverlayWindow.width, height: newH)
-        self.setFrame(newFrame, display: true, animate: false)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.15
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            self.animator().setFrame(newFrame, display: true)
+        }
     }
 
     private func scheduleHide(after delay: TimeInterval) {

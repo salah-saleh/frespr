@@ -132,7 +132,18 @@ struct OverlayView: View {
             }
 
         case .processing:
-            let processingLabel = AppSettings.shared.translationEnabled ? "TRANSLATING" : "PROCESSING"
+            let processingLabel: String = {
+                let s = AppSettings.shared
+                if s.translationEnabled {
+                    return "TRANSLATING"
+                }
+                switch s.postProcessingMode {
+                case .cleanup:   return "CLEANING UP"
+                case .summarize: return "SUMMARIZING"
+                case .custom:    return "PROCESSING"
+                case .none:      return "FINISHING"
+                }
+            }()
             Text(processingLabel)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.brand1)
@@ -176,7 +187,7 @@ struct OverlayView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     Text(viewModel.displayText)
                         .font(.system(size: 14.5))
-                        .foregroundStyle(viewModel.isFinal ? Color(white: 0.93) : Color(white: 0.6))
+                        .foregroundStyle(viewModel.isFinal ? Color(white: 0.93) : Color.brand3.opacity(0.6))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .id("text")

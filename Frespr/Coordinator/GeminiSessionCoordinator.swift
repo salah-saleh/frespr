@@ -105,6 +105,7 @@ final class GeminiSessionCoordinator {
         geminiService.onError = { [weak self] error in
             Task { @MainActor [weak self] in
                 dbg("geminiService.onError: \(error.localizedDescription)")
+                AudioFeedback.shared.playError()
                 self?.state = .error(error.localizedDescription)
                 self?.onError?(error.localizedDescription)
                 self?.cleanup()
@@ -168,11 +169,12 @@ final class GeminiSessionCoordinator {
             self.accumulatedTranscript = ""
             self.connectBuffer.removeAll()
             dbg("startRecording — starting audio capture immediately, then connecting")
+            AudioFeedback.shared.playStart()
             self.state = .connecting
             self.startAudioCapture()
 
             do {
-                try await self.geminiService.connect(apiKey: apiKey)
+                try await self.connectWithRetry(apiKey: apiKey)
             } catch {
                 self.state = .error(error.localizedDescription)
                 self.onError?(error.localizedDescription)
@@ -184,6 +186,7 @@ final class GeminiSessionCoordinator {
     /// Called when hotkey is released (hold mode) or second press (toggle mode)
     func stopRecording() {
         guard state == .recording || state == .connecting else { return }
+        AudioFeedback.shared.playStop()
         state = .processing
         audioEngine.stop()
 
@@ -192,13 +195,13 @@ final class GeminiSessionCoordinator {
         // that may never get a turnComplete (server can take seconds to respond).
         geminiService.sendStreamEnd()
 
-        // Wait a short window for the last in-flight audio chunks to arrive
-        // and be transcribed before we snap and deliver. Without this, the
-        // final word(s) spoken just before key release are still travelling
-        // through the network when we read currentTurnTranscript.
+        // Wait for the last in-flight audio chunks to arrive and be
+        // transcribed. Most transcripts arrive via turnComplete (which
+        // triggers immediate delivery at line 89-91). This fallback timer
+        // catches the rare case where turnComplete hasn't fired yet.
         Task {
-            try? await Task.sleep(nanoseconds: 1_200_000_000)  // 1.2s collection window
-            guard self.state == .processing else { return }  // may have already delivered via turnComplete
+            try? await Task.sleep(nanoseconds: 600_000_000)  // 600ms collection window
+            guard self.state == .processing else { return }  // already delivered via turnComplete
 
             let partial = self.normalizeTranscription(self.geminiService.currentTurnTranscript)
             if !partial.isEmpty {
@@ -206,12 +209,30 @@ final class GeminiSessionCoordinator {
                 if !self.accumulatedTranscript.isEmpty { self.accumulatedTranscript += " " }
                 self.accumulatedTranscript += partial
             }
-            dbg("stopRecording: delivering after 700ms, total len=\(self.accumulatedTranscript.count)")
+            dbg("stopRecording: delivering after 600ms, total len=\(self.accumulatedTranscript.count)")
             self.deliverTranscript()
         }
     }
 
     // MARK: - Private
+
+    /// Connects to Gemini with up to 3 attempts and exponential backoff.
+    private func connectWithRetry(apiKey: String, maxAttempts: Int = 3) async throws {
+        var lastError: Error?
+        for attempt in 1...maxAttempts {
+            do {
+                try await geminiService.connect(apiKey: apiKey)
+                return
+            } catch {
+                lastError = error
+                guard attempt < maxAttempts, state == .connecting else { break }
+                let backoffMs = Int(pow(2.0, Double(attempt - 1))) * 150
+                dbg("connection attempt \(attempt) failed, retrying in \(backoffMs)ms")
+                try? await Task.sleep(nanoseconds: UInt64(backoffMs) * 1_000_000)
+            }
+        }
+        throw lastError ?? GeminiLiveError.connectionFailed("Max retries exceeded")
+    }
 
     private func startAudioCapture() {
         silenceChunkCount = 0
@@ -287,6 +308,7 @@ final class GeminiSessionCoordinator {
             }
 
             // Cleanup (hides overlay, restores focus to target app), then inject
+            AudioFeedback.shared.playSuccess()
             self.cleanup()
             try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms for OS focus restore
             dbg("injecting: '\(finalText.prefix(80))'")

@@ -19,6 +19,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let ppCustomField    = NSTextField()
     private let hotKeyPopup      = NSPopUpButton()
     private let clipboardCheck   = NSButton(checkboxWithTitle: "Copy transcript to clipboard", target: nil, action: nil)
+    private let soundCheck       = NSButton(checkboxWithTitle: "Sound feedback (start/stop/success beeps)", target: nil, action: nil)
     private let translationCheck = NSButton(checkboxWithTitle: "Translate transcription", target: nil, action: nil)
     private let translationSourcePopup = NSPopUpButton()
     private let translationTargetPopup = NSPopUpButton()
@@ -216,6 +217,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         clipboardCheck.target = self; clipboardCheck.action = #selector(clipboardCheckChanged)
         stack.addArrangedSubview(row(clipboardCheck))
 
+        soundCheck.target = self; soundCheck.action = #selector(soundCheckChanged)
+        stack.addArrangedSubview(row(soundCheck))
+
         stack.addArrangedSubview(divider())
 
         // ── Translation ──────────────────────────────────────────────
@@ -372,6 +376,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             hotKeyPopup.selectItem(at: idx)
         }
         clipboardCheck.state = s.copyToClipboard ? .on : .off
+        soundCheck.state = s.soundFeedbackEnabled ? .on : .off
         translationCheck.state = s.translationEnabled ? .on : .off
         translationSourcePopup.selectItem(withTitle: s.translationSourceLanguage)
         if translationSourcePopup.indexOfSelectedItem < 0 { translationSourcePopup.selectItem(at: 0) }
@@ -562,6 +567,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func clipboardCheckChanged() {
         AppSettings.shared.copyToClipboard = clipboardCheck.state == .on
+    }
+
+    @objc private func soundCheckChanged() {
+        AppSettings.shared.soundFeedbackEnabled = soundCheck.state == .on
     }
 
     @objc private func translationCheckChanged() {

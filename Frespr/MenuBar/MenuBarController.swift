@@ -112,8 +112,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .recording:  name = "menubar-recording"
         case .processing: name = "menubar-processing"
         }
-        statusItem?.button?.image = Self.menuBarImage(named: name)
-        statusItem?.button?.image?.isTemplate = true
+        guard let button = statusItem?.button else { return }
+        // Fade-pulse transition for a polished feel
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.1
+            button.animator().alphaValue = 0.3
+        }, completionHandler: {
+            button.image = Self.menuBarImage(named: name)
+            button.image?.isTemplate = true
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.08
+                button.animator().alphaValue = 1.0
+            }
+        })
     }
 
     // Load the @2x-aware menu bar PNG from the app bundle

@@ -64,6 +64,11 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.translationTargetLanguage) }
     }
 
+    var soundFeedbackEnabled: Bool {
+        get { defaults.bool(forKey: Keys.soundFeedbackEnabled) }
+        set { defaults.set(newValue, forKey: Keys.soundFeedbackEnabled) }
+    }
+
     var lastUpdateCheckDate: Date? {
         get {
             let t = defaults.double(forKey: Keys.lastUpdateCheckDate)
@@ -113,6 +118,7 @@ final class AppSettings {
             Keys.silenceTimeoutSeconds: 10,
             Keys.hotKeyOption: HotKeyOption.rightOption.rawValue,
             Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue,
+            Keys.soundFeedbackEnabled: true,
             Keys.translationEnabled: false,
             Keys.translationSourceLanguage: "Auto-detect",
             Keys.translationTargetLanguage: "English"
@@ -136,6 +142,7 @@ final class AppSettings {
         static let translationSourceLanguage = "translationSourceLanguage"
         static let translationTargetLanguage = "translationTargetLanguage"
         static let translationFavorites      = "translationFavorites"
+        static let soundFeedbackEnabled      = "soundFeedbackEnabled"
         static let lastUpdateCheckDate       = "lastUpdateCheckDate"
     }
 }
