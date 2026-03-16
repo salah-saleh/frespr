@@ -34,6 +34,7 @@ enum GeminiLiveError: Error, LocalizedError {
 final class GeminiLiveService {
     var onTranscriptUpdate: ((String, Bool) -> Void)?
     var onSetupComplete: (() -> Void)?
+    var onModelTurnComplete: (() -> Void)?
     var onError: ((GeminiLiveError) -> Void)?
     var onDisconnected: (() -> Void)?
 
@@ -53,7 +54,7 @@ final class GeminiLiveService {
         guard !apiKey.isEmpty else { throw GeminiLiveError.missingAPIKey }
 
         let host = "generativelanguage.googleapis.com"
-        let path = "/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+        let path = "/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent"
 
         dbg("connecting (raw NWConnection + manual WS) to \(host)")
 
@@ -258,9 +259,29 @@ final class GeminiLiveService {
 
     func sendStreamEnd() {
         guard isConnected else { return }
-        dbg("sending audioStreamEnd")
-        let message = GeminiRealtimeInputMessage.streamEnd
-        Task { [weak self] in try? await self?.sendEncodable(message) }
+        dbg("sending activityEnd + audioStreamEnd")
+        Task { [weak self] in
+            try? await self?.sendEncodable(GeminiActivityMessage.end)
+            try? await self?.sendEncodable(GeminiRealtimeInputMessage.streamEnd)
+        }
+    }
+
+    func sendActivityStart() {
+        guard isConnected else { return }
+        dbg("sending activityStart")
+        Task { [weak self] in try? await self?.sendEncodable(GeminiActivityMessage.start) }
+    }
+
+    /// Sends activityEnd immediately followed by activityStart to flush the current
+    /// transcription segment and open a new one. Used by the heartbeat timer to work
+    /// around the Gemini Live bug where inputAudioTranscription events stop after ~100 chunks.
+    func sendActivityBounce() {
+        guard isConnected else { return }
+        dbg("sending activityEnd + activityStart (bounce)")
+        Task { [weak self] in
+            try? await self?.sendEncodable(GeminiActivityMessage.end)
+            try? await self?.sendEncodable(GeminiActivityMessage.start)
+        }
     }
 
     private func sendEncodable<T: Encodable>(_ value: T) async throws {
@@ -320,19 +341,37 @@ final class GeminiLiveService {
             onSetupComplete?()
             return
         }
+        if msg.goAway != nil {
+            dbg("goAway received — server will disconnect soon")
+            return
+        }
         if let content = msg.serverContent {
+            // Ignore model audio/text responses (modelTurn) — we only care about inputTranscription.
+            // The native audio model may generate responses despite system instructions;
+            // processing them would block transcription updates.
+            if content.modelTurn != nil {
+                dbg("ignoring modelTurn content")
+                // Still check for turnComplete/generationComplete on this message
+            }
+
             // Accumulate transcript chunks as they arrive (interim updates)
             if let transcription = content.inputTranscription, let text = transcription.text, !text.isEmpty {
                 transcriptAccumulator += text
                 dbg("transcript chunk: '\(text)' accumulated: '\(transcriptAccumulator)'")
                 onTranscriptUpdate?(transcriptAccumulator, false)
             }
-            // Fire final transcript on turnComplete OR generationComplete —
-            // the native audio model sends generationComplete but not always turnComplete.
-            let isDone = content.turnComplete == true || content.generationComplete == true
-            if isDone && !transcriptAccumulator.isEmpty {
+            // generationComplete means the model finished its audio response.
+            // Notify coordinator so it can re-send activityStart and resume transcription.
+            if content.generationComplete == true {
+                dbg("generationComplete — model response done, notifying coordinator to resume")
+                onModelTurnComplete?()
+            }
+
+            // Fire final transcript on turnComplete only (not generationComplete —
+            // that's the model's own response finishing, not the user's speech turn).
+            if content.turnComplete == true && !transcriptAccumulator.isEmpty {
                 let final = transcriptAccumulator.trimmingCharacters(in: .whitespaces)
-                dbg("turn done (turnComplete=\(content.turnComplete ?? false) generationComplete=\(content.generationComplete ?? false)) — final: '\(final)'")
+                dbg("turnComplete — final: '\(final)'")
                 transcriptAccumulator = ""
                 if !final.isEmpty {
                     onTranscriptUpdate?(final, true)

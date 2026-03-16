@@ -19,6 +19,8 @@ final class GeminiSessionCoordinator {
     private var isToggled = false
     private var isDelivering = false  // guards against double-delivery
     private var silenceChunkCount = 0
+    private var transcriptHeartbeatTimer: Timer?
+    private var heartbeatBounceInFlight = false  // suppresses redundant activityStart after bounce
     private let silenceLevelThreshold: Float = 0.01
 
     // Accumulates all final transcript segments delivered by the server's VAD
@@ -55,10 +57,37 @@ final class GeminiSessionCoordinator {
     // MARK: - Setup
 
     private func setupGeminiCallbacks() {
+        geminiService.onModelTurnComplete = { [weak self] in
+            guard let self, self.state == .recording else { return }
+            // If a heartbeat bounce just sent activityEnd+activityStart, skip the
+            // redundant activityStart here — the bounce already reopened the activity.
+            if self.heartbeatBounceInFlight {
+                dbg("onModelTurnComplete: skipping activityStart (heartbeat bounce in flight)")
+                self.heartbeatBounceInFlight = false
+                return
+            }
+            // Model finished its audio response — re-send activityStart so the server
+            // resumes transcribing the ongoing audio stream.
+            dbg("onModelTurnComplete: re-sending activityStart to resume transcription")
+            self.geminiService.sendActivityStart()
+        }
+
         geminiService.onSetupComplete = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self = self, self.state == .connecting else { return }
                 self.state = .recording
+                // Tell the server we're starting a speech activity (VAD is disabled,
+                // so without this the server won't know we're speaking).
+                self.geminiService.sendActivityStart()
+                // Start heartbeat to keep transcription events flowing (Gemini Live bug workaround)
+                self.transcriptHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.state == .recording else { return }
+                        dbg("heartbeat: sending activityEnd+activityStart to flush transcription segment")
+                        self.heartbeatBounceInFlight = true
+                        self.geminiService.sendActivityBounce()
+                    }
+                }
                 // Flush any audio buffered during the connection handshake.
                 if !self.connectBuffer.isEmpty {
                     dbg("flushing \(self.connectBuffer.count) pre-connect audio chunks")
@@ -415,6 +444,9 @@ final class GeminiSessionCoordinator {
     }
 
     private func cleanup() {
+        transcriptHeartbeatTimer?.invalidate()
+        transcriptHeartbeatTimer = nil
+        heartbeatBounceInFlight = false
         audioEngine.stop()
         geminiService.disconnect()
         state = .idle
