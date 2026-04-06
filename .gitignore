@@ -22,3 +22,6 @@ DerivedData/
 
 # Logs
 /tmp/frespr_debug.log
+
+# Specify
+.specify/

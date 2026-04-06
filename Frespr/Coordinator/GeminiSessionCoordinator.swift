@@ -109,6 +109,8 @@ final class GeminiSessionCoordinator {
                 // Normalize each segment individually before appending so that
                 // ALL-CAPS turns get fixed without affecting already-correct turns.
                 let normalized = self.normalizeTranscription(text)
+                // Skip noise-only segments that normalize to empty string.
+                guard !normalized.isEmpty else { return }
                 if !self.accumulatedTranscript.isEmpty {
                     self.accumulatedTranscript += " "
                 }
@@ -124,9 +126,10 @@ final class GeminiSessionCoordinator {
                 }
             } else {
                 // Interim update — show prior segments + current partial.
+                let filtered = self.normalizeTranscription(text)
                 let display = self.accumulatedTranscript.isEmpty
-                    ? text
-                    : self.accumulatedTranscript + " " + text
+                    ? filtered
+                    : self.accumulatedTranscript + " " + filtered
                 self.onTranscriptUpdate?(display, false)
             }
         }
@@ -412,7 +415,11 @@ final class GeminiSessionCoordinator {
 
     /// Fixes ALL-CAPS and other formatting artifacts from the native audio model.
     private func normalizeTranscription(_ text: String) -> String {
-        var result = text.trimmingCharacters(in: .whitespaces)
+        // Strip bracketed noise/sound annotations Gemini emits (e.g. [noise], [music], [laughter]).
+        var result = text.replacingOccurrences(of: "\\[[^\\]]*\\]", with: "", options: .regularExpression)
+        // Collapse any double-spaces left behind after stripping annotations.
+        result = result.replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
+        result = result.trimmingCharacters(in: .whitespaces)
 
         // If the entire text (ignoring punctuation) is uppercase, convert to
         // sentence case. The native audio model in AUDIO mode often returns
