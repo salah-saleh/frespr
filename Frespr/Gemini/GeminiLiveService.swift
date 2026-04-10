@@ -29,6 +29,59 @@ enum GeminiLiveError: Error, LocalizedError {
 // - NWProtocolWebSocket sends "GET / HTTP/1.1" for the upgrade, ignoring the
 //   URL path, so the API key query string is lost → server rejects.
 // - Raw NWConnection lets us send the exact path+query and control ALPN.
+//
+// ── Issue: transcription lag building up over time ──────────────────────────
+//
+// SYMPTOM: After 10-20s of recording, the overlay text fell progressively
+// further behind what the user was actually saying. Smooth at first, then
+// increasingly delayed.
+//
+// WHY IT HAPPENED (plain): Every 100ms an audio chunk is sent to Gemini. The
+// original code fired each send independently without waiting for the previous
+// one to finish. Sending data over a network takes a small but non-zero amount
+// of time. So sends started piling up: chunk 2 was fired before chunk 1
+// finished, then chunk 3, chunk 4... After 20 seconds there were hundreds of
+// backed-up chunks waiting to go out. Gemini was transcribing audio from
+// 5-10 seconds ago — hence the growing lag.
+//
+// WHY IT HAPPENED (technical): sendAudioChunk() spawned a new unstructured
+// Task per 100ms chunk (10/sec). Each Task called rawSend(), which awaits
+// NWConnection.send(.contentProcessed). NWConnection serializes sends
+// internally, so all 10 tasks/sec queued behind each other. The queue started
+// empty (smooth), but grew by the difference between audio production rate and
+// network flush rate — causing a steadily increasing backlog.
+//
+// FIX: All sends now go through a single serial queue (sendTask drain loop).
+// All sendEncodable() calls yield frames to an AsyncStream; one drain task
+// processes them one-at-a-time. One chunk goes out, waits for confirmation,
+// then the next one goes. The queue stays empty because we never get ahead of
+// ourselves. Confirmed via debug log: chunks flow at a steady 10/sec with no
+// buildup throughout a full recording session.
+//
+// REMAINING PERCEIVED DELAY: After this fix, a ~2-3s transcription lag and
+// ~4s gaps after each heartbeat bounce are still visible. This is entirely
+// Gemini server-side latency — the client is sending audio on time. Nothing
+// we can do client-side to reduce this.
+//
+// ── Issue: words dropped near heartbeat bounces ──────────────────────────────
+//
+// SYMPTOM: Words spoken around the 8s / 16s / 24s marks occasionally got
+// dropped from the transcript.
+//
+// WHY IT HAPPENED (plain): The heartbeat sends activityEnd then activityStart
+// back-to-back (see heartbeat explanation in GeminiSessionCoordinator). Audio
+// chunks that were already in-flight when activityEnd was sent could arrive at
+// the server AFTER activityStart — the server attributed them to the new
+// window instead of the closing one, and those words were lost.
+//
+// WHY IT HAPPENED (technical): sendActivityBounce() sent activityEnd +
+// activityStart with no gap. sendAudioChunk() spawns independent Tasks. Those
+// in-flight audio Tasks could reach the server AFTER activityStart, attributing
+// audio to the new activity window instead of the closing one.
+//
+// FIX: 150ms gap between activityEnd and activityStart in sendActivityBounce()
+// gives in-flight audio chunks time to drain through the serial queue before
+// the new activity window opens.
 
 @MainActor
 final class GeminiLiveService {
@@ -47,6 +100,13 @@ final class GeminiLiveService {
 
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+
+    // Serial send queue — all outbound WebSocket frames go through here
+    // one at a time. Prevents concurrent rawSend calls from piling up on
+    // NWConnection's internal queue, which causes steadily growing lag.
+    private var sendQueue: AsyncStream<Data>?
+    private var sendQueueContinuation: AsyncStream<Data>.Continuation?
+    private var sendTask: Task<Void, Never>?
 
     // MARK: - Connect
 
@@ -111,7 +171,20 @@ final class GeminiLiveService {
         }
 
         isConnected = true
-        dbg("WebSocket handshake complete — starting receive loop")
+        dbg("WebSocket handshake complete — starting receive + send loops")
+
+        // Start serial send queue drain loop
+        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        sendQueue = stream
+        sendQueueContinuation = continuation
+        sendTask = Task { [weak self] in
+            guard let self else { return }
+            for await frame in stream {
+                guard self.isConnected else { break }
+                try? await self.rawSend(frame)
+            }
+            dbg("sendTask drain loop ended")
+        }
 
         receiveTask = Task { [weak self] in await self?.receiveLoop() }
 
@@ -280,6 +353,9 @@ final class GeminiLiveService {
         dbg("sending activityEnd + activityStart (bounce)")
         Task { [weak self] in
             try? await self?.sendEncodable(GeminiActivityMessage.end)
+            // Small gap lets in-flight audio chunks drain before activityStart so
+            // they're attributed to the closing activity rather than the new one.
+            try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms
             try? await self?.sendEncodable(GeminiActivityMessage.start)
         }
     }
@@ -291,7 +367,14 @@ final class GeminiLiveService {
         guard let text = String(data: data, encoding: .utf8) else {
             throw GeminiLiveError.encodingError(GeminiLiveError.disconnected)
         }
-        try await rawSend(wsTextFrame(text))
+        let frame = wsTextFrame(text)
+        if let continuation = sendQueueContinuation {
+            // Queue is live — enqueue for serial drain (prevents concurrent rawSend buildup)
+            continuation.yield(frame)
+        } else {
+            // Queue not yet started (HTTP upgrade phase) — send directly
+            try await rawSend(frame)
+        }
     }
 
     // MARK: - Receive Loop
@@ -389,6 +472,11 @@ final class GeminiLiveService {
         isConnected = false
         receiveTask?.cancel()
         receiveTask = nil
+        sendQueueContinuation?.finish()
+        sendQueueContinuation = nil
+        sendQueue = nil
+        sendTask?.cancel()
+        sendTask = nil
         connection?.cancel()
         connection = nil
         recvBuffer = Data()

@@ -89,7 +89,9 @@ wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.G
 
 Flow: connect → send setup (`responseModalities: ["TEXT"]`, `inputAudioTranscription: {}`) → wait for `setupComplete` → stream PCM chunks as base64 → send `audioStreamEnd: true` on hotkey release → 1.2s collection window → snap `currentTurnTranscript` → post-process (optional) → inject → disconnect.
 
-Model: `models/gemini-live-2.5-flash-native-audio`
+Model: `models/gemini-2.5-flash-native-audio-preview-12-2025` (actual ID in `GeminiProtocol.swift`)
+
+**Upgrading to `gemini-3.1-flash-live-preview`**: Not a simple model ID swap — breaking changes include multi-part server events, restricted `send_client_content`, and new `thinkingLevel` config. Requires protocol updates before attempting.
 
 ## Type-checking Without Xcode
 

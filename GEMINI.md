@@ -10,6 +10,8 @@ bash build.sh pkg      # compiles, signs, packages → Frespr.pkg
 open Frespr.pkg        # installs to /Applications
 ```
 
+During dev use > bash build.sh , don't build the pkg.
+
 No Xcode needed — uses `swiftc` from Command Line Tools.
 
 ## Versioning & Releases

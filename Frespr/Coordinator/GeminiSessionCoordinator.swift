@@ -79,7 +79,27 @@ final class GeminiSessionCoordinator {
                 // Tell the server we're starting a speech activity (VAD is disabled,
                 // so without this the server won't know we're speaking).
                 self.geminiService.sendActivityStart()
-                // Start heartbeat to keep transcription events flowing (Gemini Live bug workaround)
+                // Heartbeat — workaround for a Gemini Live server bug.
+                //
+                // WHY (plain): After receiving ~100 audio chunks (~10 seconds), Gemini
+                // silently stops sending transcription updates. You keep talking, audio
+                // keeps flowing, but nothing new appears in the overlay — it freezes.
+                //
+                // WHY (technical): The server's inputAudioTranscription pipeline stops
+                // emitting events after ~100 chunks within a single activity window.
+                // Root cause is unknown (confirmed Gemini Live bug, not our code).
+                //
+                // FIX: Every 8 seconds we send activityEnd + activityStart. This tells
+                // the server "this speech segment is done, starting a new one." The
+                // server flushes what it accumulated as a turnComplete, resets its
+                // internal state, and starts transcribing fresh.
+                //
+                // DOWNSIDE: After each bounce the server takes ~4 seconds to resume
+                // sending transcription words for the new segment. So every 8 seconds
+                // there's a ~4s gap in the overlay where nothing new appears even
+                // though the user is still speaking. This is Gemini server-side
+                // latency — there's no known way to avoid it while still working
+                // around the bug.
                 self.transcriptHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self, self.state == .recording else { return }
@@ -227,21 +247,38 @@ final class GeminiSessionCoordinator {
         // that may never get a turnComplete (server can take seconds to respond).
         geminiService.sendStreamEnd()
 
-        // Wait for the last in-flight audio chunks to arrive and be
-        // transcribed. Most transcripts arrive via turnComplete (which
-        // triggers immediate delivery at line 89-91). This fallback timer
-        // catches the rare case where turnComplete hasn't fired yet.
+        // Wait for the server to return turnComplete for the final segment.
+        //
+        // History of this timeout:
+        //   5000ms → 700ms → 1200ms → 600ms → 1500ms → poll-up-to-4000ms (current)
+        //
+        // Why it kept breaking:
+        //   A fixed sleep races against variable server latency. Gemini needs
+        //   2-4s to return turnComplete after activityEnd, especially when a
+        //   heartbeat bounce fired recently (bounce at t=0, key release at t=3
+        //   means activityEnd was just sent ~3s into a fresh turn — server may
+        //   not have accumulated enough audio to close the turn quickly).
+        //   Any fixed value either felt slow (5s) or dropped final words (600ms).
+        //
+        // Current approach: poll state every 100ms for up to 4s.
+        //   - turnComplete fires → deliverTranscript() → state becomes .idle.
+        //   - The poll detects state != .processing and exits immediately.
+        //   - No wasted wait time when the server is fast (common case: ~1-2s).
+        //   - 4s hard cap catches the rare case where turnComplete never arrives
+        //     (connection drop, server bug) — snap currentTurnTranscript partial.
         Task {
-            try? await Task.sleep(nanoseconds: 600_000_000)  // 600ms collection window
-            guard self.state == .processing else { return }  // already delivered via turnComplete
-
+            for _ in 0..<40 {
+                try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms
+                guard self.state == .processing else { return }  // turnComplete already delivered
+            }
+            // 4s elapsed and no turnComplete — snap whatever partial we have
             let partial = self.normalizeTranscription(self.geminiService.currentTurnTranscript)
             if !partial.isEmpty {
-                dbg("stopRecording: snapping partial turn: '\(partial.prefix(80))'")
+                dbg("stopRecording: snapping partial turn after 4s: '\(partial.prefix(80))'")
                 if !self.accumulatedTranscript.isEmpty { self.accumulatedTranscript += " " }
                 self.accumulatedTranscript += partial
             }
-            dbg("stopRecording: delivering after 600ms, total len=\(self.accumulatedTranscript.count)")
+            dbg("stopRecording: delivering after 4s timeout, total len=\(self.accumulatedTranscript.count)")
             self.deliverTranscript()
         }
     }
