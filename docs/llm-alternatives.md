@@ -118,12 +118,83 @@ no API key, no privacy concerns.
 - Works offline
 - Swift package — integrates directly into macOS apps
 - macOS 14+ required (already Frespr's minimum)
-- ~200-300MB model download on first run
+- ~800MB model download on first run
 
 Published at ICML 2025 by Argmax; Apple contributed to the project. It's
 production-ready.
 
-Best choice if: offline capability, zero cost, or privacy are priorities.
+Best choice if: offline capability, zero cost, or privacy are priorities, and
+you want the cleanest Swift integration available today.
+
+---
+
+## WhisperKit vs Voxtral Mini Realtime
+
+The two on-device options compared directly for Frespr's use case:
+
+| | WhisperKit | Voxtral Mini Realtime |
+|---|---|---|
+| **Streaming model** | Chunk-based (~1s audio window, then transcribe) | Causal encoder — words stream as you speak |
+| **Perceived latency** | ~450ms, text appears in bursts | ~240ms, word-by-word in real-time |
+| **Accuracy (WER)** | 2.2% — best-in-class, well-proven | Newer, less battle-tested on noisy audio |
+| **Swift integration** | Native Swift package, clean API | `voxtral.c` wrapped in `Process` — glue code needed |
+| **Model size** | ~800MB (Large v3 Turbo) | ~2-3GB (4B params, GGUF Q4) |
+| **Maturity** | Production-ready, Apple co-developed | Released Feb 2026, community still maturing |
+| **MLX port** | Yes, stable | Yes, community port |
+
+The key UX difference: WhisperKit transcribes in bursts every ~1s. Voxtral streams
+causally — words appear one by one as you say them, like live captioning. That's a
+fundamentally better UX for a dictation overlay.
+
+**If you want to ship now:** WhisperKit. Proper Swift package, battle-tested, 450ms
+is still 4-5x better than Gemini Live.
+
+**If you want the best UX and can handle C/process integration:** Voxtral. Worth
+revisiting in 2-3 months as the Swift/MLX ecosystem matures around it.
+
+---
+
+## Strategy: keep both Gemini and on-device, or replace?
+
+**Don't replace Gemini entirely.** Keep both as a swappable backend:
+
+- Gemini Live is the only option with built-in post-processing (cleanup/summarize/
+  custom prompt) on the same API key. That's a real differentiator vs plain dictation.
+- Users who already have a Gemini key shouldn't be forced to set up a new runtime.
+- On-device serves users who want offline, zero cost, or privacy.
+
+**Recommended architecture:** a pluggable backend abstraction behind `GeminiSessionCoordinator`,
+with a Settings toggle — Gemini Live (default) / On-device (Voxtral or WhisperKit) /
+Deepgram (cloud, fastest). Same hotkey UX, same overlay, same post-processing step
+regardless of which backend transcribes. The backend is just a swappable protocol.
+
+Post-processing stays on Gemini REST no matter which transcription backend is active.
+
+---
+
+## Self-hosting Voxtral (not recommended at this stage)
+
+Running Voxtral on a server you operate recreates the problems Gemini Live already has,
+plus adds ops burden:
+
+- Server latency adds 30-50ms round-trip on top of the 240ms model latency — comparable
+  to Deepgram, but you maintain the infrastructure.
+- A GPU/CPU instance for a 4B model costs ~$50-200/month running 24/7.
+- You take on auth, rate limiting, uptime, scaling, and abuse prevention.
+
+This only makes sense at scale (thousands of paying users where $0.001/min adds up and
+you want cost control + fine-tuning). For now: run it on-device or use Deepgram.
+
+---
+
+## Model storage: nothing in the repo
+
+On-device models (WhisperKit or Voxtral) are never bundled in the repo or `.pkg`.
+They download on first use to `~/Library/Application Support/Frespr/` and are cached
+permanently. The repo contains only the code to manage the download and invoke the model.
+
+**UX recommendation:** show an explicit "Download model (800MB)" prompt on first use
+rather than downloading silently mid-session. Users should opt in knowingly.
 
 ---
 
