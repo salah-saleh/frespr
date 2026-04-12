@@ -1,6 +1,6 @@
 # Frespr
 
-Native macOS menu bar app for voice-to-text dictation using Gemini Live API. Hold a hotkey to record, release to transcribe and inject text into the focused app.
+Native macOS menu bar app for voice-to-text dictation using Deepgram Nova-3. Press a hotkey to record, press again to transcribe and inject text into the focused app.
 
 ## Build & Install
 
@@ -10,20 +10,25 @@ bash build.sh pkg      # compiles, signs, packages → Frespr.pkg
 open Frespr.pkg        # installs to /Applications
 ```
 
-Very Important, always use bash build.sh (dev mode with claude)
+Very Important, always use `bash build.sh` (dev mode with claude).
 No Xcode needed — uses `swiftc` from Command Line Tools.
 
 ## Versioning & Releases
 
-Version is controlled by the `VERSION` file at the repo root (e.g. `1.0.0`).
+Version is controlled by the `VERSION` file at the repo root (e.g. `2.0.0`).
 `build.sh` reads it automatically; Info.plist uses `FRESPR_VERSION` as a placeholder that gets patched at bundle time.
 
-**To ship a new release:**
-1. Edit `VERSION` to the new version (e.g. `1.1.0`)
-2. Commit: `git commit -am "bump version to 1.1.0"`
-3. Tag: `git tag v1.1.0 && git push origin main --tags`
-4. GitHub Actions (`.github/workflows/release.yml`) builds `Frespr.pkg` on a macOS runner and publishes it as a GitHub Release automatically.
-5. The landing page download links point to `releases/latest/download/Frespr.pkg` so they update immediately.
+**To ship a new release — follow ALL steps in order:**
+1. Update `README.md` — verify backend names, setup steps, feature list, and API key requirements are current
+2. Update `docs/index.html` — verify all feature cards, privacy copy, comparison table, and setup instructions reflect the current version
+3. Update `CLAUDE.md` — verify project structure, architecture decisions, and gotchas are current
+4. Edit `VERSION` to the new version (e.g. `2.1.0`)
+5. Commit everything: `git commit -am "bump version to 2.1.0"`
+6. Tag: `git tag v2.1.0 && git push origin main --tags`
+7. GitHub Actions (`.github/workflows/release.yml`) builds `Frespr.pkg` on a macOS runner and publishes it as a GitHub Release automatically.
+8. The landing page download links point to `releases/latest/download/Frespr.pkg` so they update immediately.
+
+**Never bump the version or tag before steps 1–3 are done.**
 
 ## GitHub Pages
 
@@ -38,15 +43,18 @@ Frespr/
 ├── App/
 │   ├── main.swift                    # Entry point
 │   ├── AppDelegate.swift             # Wires all subsystems; owns settings window lifecycle
-│   └── Debug.swift                   # dbg() helper (no-op in release builds)
+│   └── Debug.swift                   # dbg() helper (writes to /tmp/frespr_debug.log)
 ├── Audio/
 │   └── AudioCaptureEngine.swift      # AVAudioEngine → 16kHz Int16 PCM chunks
 ├── Coordinator/
-│   └── GeminiSessionCoordinator.swift # State machine: idle→connecting→recording→processing
+│   ├── TranscriptionBackend.swift    # Protocol: connect/disconnect/send/callbacks
+│   └── TranscriptionCoordinator.swift # State machine: idle→connecting→recording→processing
+├── Deepgram/
+│   └── DeepgramService.swift         # Deepgram Nova-3 WebSocket streaming (primary backend)
 ├── Gemini/
-│   ├── GeminiProtocol.swift          # Codable WebSocket message types
-│   ├── GeminiLiveService.swift       # URLSessionWebSocketTask connection + send/receive
-│   └── GeminiPostProcessor.swift     # REST call to Flash for post-processing (cleanup/summarize/custom)
+│   ├── GeminiProtocol.swift          # Codable WebSocket message types (retained, unused in v2.0)
+│   ├── GeminiLiveService.swift       # NOT instantiated in v2.0; retained for future re-enablement
+│   └── GeminiPostProcessor.swift     # REST call to Gemini Flash for post-processing (optional)
 ├── HotKey/
 │   ├── GlobalHotKeyMonitor.swift     # CGEventTap for configurable hotkeys
 │   └── HotKeyOption.swift            # Enum: rightOption/leftOption/fn/rightCommand/ctrlOption
@@ -62,45 +70,48 @@ Frespr/
 ├── UI/
 │   ├── OverlayView.swift             # SwiftUI: mic indicator + live transcript
 │   ├── OverlayWindow.swift           # NSPanel floating above all apps
-│   ├── SettingsView.swift            # API key, hotkey, post-processing, permissions
-│   └── SettingsWindowController.swift # Manages activation policy switch for text field focus
+│   ├── SettingsView.swift            # Dead code — never shown; real settings is SettingsWindowController
+│   └── SettingsWindowController.swift # Pure AppKit settings: card-style sections, 560px wide
 ├── Frespr.entitlements               # Sandbox OFF, network.client, audio-input
 └── Info.plist                        # LSUIElement=YES (no Dock icon)
 ```
 
 ## Key Architecture Decisions
 
-- **Swift 6, `@MainActor`** — `AppDelegate` and `GeminiSessionCoordinator` are both `@MainActor`; `main.swift` uses `MainActor.assumeIsolated { AppDelegate() }`
+- **Swift 6, `@MainActor`** — `AppDelegate` and `TranscriptionCoordinator` are both `@MainActor`; `main.swift` uses `MainActor.assumeIsolated { AppDelegate() }`
 - **No Xcode** — built entirely with `swiftc` + `pkgbuild`; `$(EXECUTABLE_NAME)` in Info.plist must be the literal string `Frespr`
+- **Deepgram v2.0** — `DeepgramService` is the sole transcription backend. `GeminiLiveService` is retained but never instantiated. End-of-stream via `{"type":"CloseStream"}` JSON message (not WebSocket close frame).
+- **TranscriptionBackend protocol** — `@MainActor` protocol; `DeepgramService` conforms. Allows future backends without changing the coordinator.
 - **LSUIElement app focus** — settings window requires temporarily switching `NSApp.setActivationPolicy(.regular)` so text fields can receive keyboard input; switches back to `.accessory` on close
-- **Settings text fields** — use local `@State` vars synced via `onChange`, NOT `$settings.geminiAPIKey` directly (breaks paste with `@Observable`)
+- **Settings UI** — pure AppKit `NSStackView` + `NSBox` cards; `SettingsView.swift` is dead code. Always edit `SettingsWindowController.swift` for settings UI changes.
+- **Settings text fields** — `NSTextFieldDelegate` + `controlTextDidChange` for live saving; do NOT rely on `.action` (only fires on Return) or window close for multiline fields.
 - **Ad-hoc signing** — no `--options runtime` flag; Hardened Runtime requires a real Apple cert and causes Gatekeeper rejection on local installs
 - **postinstall script** — runs `chown` + `xattr -dr com.apple.quarantine` since pkg installs as root
-- **Audio buffering** — `connectBuffer` in `GeminiSessionCoordinator` captures audio chunks during the WebSocket handshake and flushes them on `setupComplete`; avoids dropping the first word(s)
-- **Transcript accumulation** — server VAD delivers multiple `turnComplete` segments during a long recording; `accumulatedTranscript` joins them; `currentTurnTranscript` in `GeminiLiveService` snapshots the final partial turn at key release
-- **Hotkey** — `HotKeyOption` enum covers 5 choices; `GlobalHotKeyMonitor` uses CGEventTap + `.flagsChanged`; hotkey changes post a `hotKeyChanged` notification so the monitor can swap the tap without restart
-- **Post-processing callback race** — `onTranscriptUpdate` is called synchronously from a `@MainActor` context; do NOT re-wrap in `Task { @MainActor }` or `stopRecording()` races against `accumulatedTranscript` updates
+- **Audio buffering** — `connectBuffer` in `TranscriptionCoordinator` captures audio chunks during WebSocket handshake and flushes on `setupComplete`; avoids dropping the first word(s)
+- **Transcript accumulation** — Deepgram delivers multiple `is_final=true` segments during recording; `accumulatedTranscript` joins them; all delivered before `onDisconnected`
+- **Hotkey toggle mode** — `onKeyDown` → `handleHotkeyPress()`; `onKeyUp` ignored. `pendingStop` flag defers stop if key released during `.connecting`. CGEventTap auto-re-enabled via raw type values `0xFFFFFFFE`/`0xFFFFFFFF` to survive macOS disabling it.
+- **isDelivering guard** — prevents double-delivery; `onDisconnected` skips cleanup if `isDelivering=true` (post-processing in flight)
+- **Silence detection** — auto-calibrates threshold during `.connecting` phase (5 ambient chunks → baseline × 2.5, floor 0.003); active during `.recording` only
+- **Post-processing** — `postProcess()` uses `userMessagePrefix` param: "Reformat" for cleanup/summarize, "Process" for custom so the system prompt is the sole directive
+- **Post-processing callback race** — `onTranscriptUpdate` called synchronously from `@MainActor`; do NOT re-wrap in `Task { @MainActor }` or `stopRecording()` races against `accumulatedTranscript`
 
-## Gemini Live API
+## Deepgram Streaming API
 
 ```
-wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={KEY}
+wss://api.deepgram.com/v1/listen?model=nova-3&encoding=linear16&sample_rate=16000&interim_results=true&punctuate=true&language=multi
 ```
 
-Flow: connect → send setup (`responseModalities: ["TEXT"]`, `inputAudioTranscription: {}`) → wait for `setupComplete` → stream PCM chunks as base64 → send `audioStreamEnd: true` on hotkey release → 1.2s collection window → snap `currentTurnTranscript` → post-process (optional) → inject → disconnect.
+Flow: connect → stream PCM chunks → send `{"type":"CloseStream"}` on hotkey stop → Deepgram flushes, delivers final transcript, closes connection → `onDisconnected` fires → `deliverTranscript()` → post-process (optional) → inject → disconnect.
 
-Model: `models/gemini-2.5-flash-native-audio-preview-12-2025` (actual ID in `GeminiProtocol.swift`)
+`language=multi`: detects mixed-language speech. Supports European + some Asian languages. Arabic requires `language=ar` explicitly (not included in `multi`).
 
-**Upgrading to `gemini-3.1-flash-live-preview`**: Not a simple model ID swap — breaking changes include multi-part server events, restricted `send_client_content`, and new `thinkingLevel` config. Requires protocol updates before attempting.
+## Debug Logs
 
-## Type-checking Without Xcode
-
+All `dbg()` calls write to `/tmp/frespr_debug.log`. Watch live with:
 ```bash
-swiftc -typecheck \
-  -target arm64-apple-macosx14.0 \
-  -sdk $(xcrun --show-sdk-path --sdk macosx) \
-  Frespr/**/*.swift Frespr/App/*.swift
+tail -f /tmp/frespr_debug.log
 ```
+Log is cleared on every `bash build.sh` run.
 
 ## Running Tests
 
@@ -108,7 +119,9 @@ swiftc -typecheck \
 swiftc -target arm64-apple-macosx14.0 -sdk $(xcrun --show-sdk-path --sdk macosx) \
   Frespr/App/Debug.swift \
   Frespr/Audio/AudioCaptureEngine.swift \
-  Frespr/Coordinator/GeminiSessionCoordinator.swift \
+  Frespr/Coordinator/TranscriptionBackend.swift \
+  Frespr/Coordinator/TranscriptionCoordinator.swift \
+  Frespr/Deepgram/DeepgramService.swift \
   Frespr/Gemini/GeminiLiveService.swift \
   Frespr/Gemini/GeminiPostProcessor.swift \
   Frespr/Gemini/GeminiProtocol.swift \
@@ -127,33 +140,33 @@ swiftc -target arm64-apple-macosx14.0 -sdk $(xcrun --show-sdk-path --sdk macosx)
   -o /tmp/SettingsTests && /tmp/SettingsTests
 ```
 
-Tests cover: `AppSettings` CRUD round-trips, default values, enum logic (`PostProcessingMode`, `HotKeyOption`), `SettingsWindowController` init smoke test, and action round-trips via `perform(NSSelectorFromString(...))`.
-
 ## End of Every Task
 
-Always finish each task by running `bash build.sh` and then `open Frespr.pkg` to install, so the user can immediately test the result.
+Always finish each task by running `bash build.sh` so the user can immediately test the result.
 
 ## Landing Page (`docs/index.html`)
 
-The landing page highlights the app's key features. Update the `.features` grid in `docs/index.html` when a major new user-facing feature ships. Current highlighted features (8 cards):
+The landing page highlights the app's key features. Update the `.features` grid in `docs/index.html` when a major new user-facing feature ships. Current highlighted features:
 
-1. **Hold to record** — push-to-talk hotkey, text at cursor
-2. **Powered by Gemini Live** — real-time streaming transcription + live overlay
-3. **Post-processing** — cleanup / summarize / custom prompt modes
+1. **Toggle to record** — press hotkey to start, press again to stop
+2. **Deepgram Nova-3** — ~300ms latency, real-time streaming transcription
+3. **Post-processing** — cleanup / summarize / custom prompt modes via Gemini
 4. **Configurable hotkey** — Right ⌥, Left ⌥, Fn/Globe, Right ⌘, Ctrl+Option
 5. **History & re-inject** — last 20 transcriptions in menu bar, click to re-inject
-6. **70 languages** — speak in any of the 70 languages Gemini Live supports (English, Spanish, French, Japanese, Arabic, Hindi, and more)
-7. **Your key, your data** — direct audio to Google, no third-party servers
+6. **70+ languages** — multi-language detection, mixed-language in same session
+7. **Your key, your data** — audio direct to Deepgram; text to Google only if post-processing enabled
 8. **Open source** — AGPL-3.0, build with Swift CLI tools, no Xcode
 
 ## Known Gotchas
 
 - `#Preview` macro requires Xcode plugins — remove from files before CLI type-checking
-- `GeminiLiveError.localizedDescription` is `String` not `String?` — no `??` needed
 - CGEventTap requires Accessibility permission; fails silently if not granted
+- CGEventTap can be silently disabled by macOS — re-enable in callback using raw types `0xFFFFFFFE`/`0xFFFFFFFF`
 - Right Option keycode is 61; detect via `.flagsChanged` + `.maskAlternate` without other modifier flags
-- Gemini Live native audio model often returns ALL-CAPS transcriptions — `normalizeTranscription()` in `GeminiSessionCoordinator` converts to sentence case
 - `SettingsWindowController` must call `NSApp.setActivationPolicy(.regular)` before `makeKeyAndOrderFront` so text fields accept keyboard input; call `.accessory` on `windowWillClose`
 - `TranscriptionLog` is in-memory only during a session; persisted to `UserDefaults` as a JSON array
-- **`NSHostingView` sizing** — `sizingOptions = []` makes `fittingSize` always return `(0,0)`; must use `sizingOptions = [.intrinsicContentSize]` for `fittingSize` to reflect SwiftUI layout. Set the hosting view as direct `contentView` (not wrapped in a container) for reliable sizing. Use a repeating Timer polling `fittingSize.height` to drive window resizing — KVO on `intrinsicContentSize` is unreliable for SwiftUI state updates.
-- **`NSScrollView` document view width** — do NOT use `scrollView.contentView.leadingAnchor/trailingAnchor` to size the document view; the clip view shrinks when the scrollbar is visible, causing asymmetric margins. Instead use a fixed `widthAnchor` constant (= window width − margins) + `centerXAnchor` on the `scrollView` itself.
+- `NSStackView` alignment = `.leading` means subviews don't fill width — use `pinWidth()` pattern (constrain each arranged subview to `scrollView.contentView.widthAnchor`) for full-width cards
+- `controlTextDidEndEditing` does not fire reliably when clicking non-text controls — use a local `NSEvent.addLocalMonitorForEvents` mouse-down monitor to force commit
+- Deepgram `sendStreamEnd()` must send `{"type":"CloseStream"}` JSON — a WebSocket ping or close frame does NOT trigger Deepgram to flush and return the final transcript
+- `language=multi` does not include Arabic — use `language=ar` for Arabic-only sessions
+- tccutil reset in build.sh requires sudo — run once: `echo "sam ALL=(ALL) NOPASSWD: /usr/bin/tccutil reset Accessibility com.frespr.app" | sudo tee /etc/sudoers.d/frespr-tccutil`
