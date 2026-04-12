@@ -419,6 +419,8 @@ final class TranscriptionCoordinator {
 
         // T039: if post-processing is requested but no Gemini key is set, warn and inject raw.
         let postMode = settings.postProcessingMode
+        dbg("deliverTranscript: postMode=\(postMode.rawValue) geminiKey=\(settings.geminiAPIKey.isEmpty ? "empty" : "set") customPrompt='\(settings.customPostProcessingPrompt.prefix(40))'")
+
         if postMode != .none && settings.geminiAPIKey.isEmpty {
             dbg("deliverTranscript: post-processing requires Gemini key — injecting raw")
             onTranscriptUpdate?("Post-processing requires a Gemini API key.", false)
@@ -473,16 +475,20 @@ final class TranscriptionCoordinator {
         guard mode != .none else { return rawText }
 
         let systemPrompt: String
+        let userMessagePrefix: String
         switch mode {
         case .none:
             return rawText
         case .cleanup, .summarize:
             guard let prompt = mode.systemPrompt else { return rawText }
             systemPrompt = prompt
+            userMessagePrefix = "Reformat"
         case .custom:
             let custom = settings.customPostProcessingPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !custom.isEmpty else { return rawText }
             systemPrompt = custom
+            // Neutral verb so the custom system prompt is the sole directive
+            userMessagePrefix = "Process"
         }
 
         let apiKey = settings.geminiAPIKey
@@ -493,7 +499,8 @@ final class TranscriptionCoordinator {
             let result = try await GeminiPostProcessor.process(
                 rawText: rawText,
                 systemPrompt: systemPrompt,
-                apiKey: apiKey
+                apiKey: apiKey,
+                userMessagePrefix: userMessagePrefix
             )
             dbg("postProcess done: '\(result.prefix(80))'")
             return result

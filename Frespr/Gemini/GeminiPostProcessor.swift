@@ -45,12 +45,20 @@ final class GeminiPostProcessor {
     /// Apply `systemPrompt` to `rawText` and return the model's response.
     /// Throws on network error, non-200 response, or empty result.
     /// Callers should catch and fall back to `rawText`.
-    static func process(rawText: String, systemPrompt: String, apiKey: String) async throws -> String {
+    ///
+    /// `userMessagePrefix` lets callers control the instruction verb so custom
+    /// prompts aren't overridden by the hardcoded "Reformat" framing.
+    static func process(
+        rawText: String,
+        systemPrompt: String,
+        apiKey: String,
+        userMessagePrefix: String = "Process"
+    ) async throws -> String {
         guard let url = URL(string: endpoint) else {
             throw URLError(.badURL)
         }
 
-        let userMessage = "Reformat this transcript:\n<transcript>\n\(rawText)\n</transcript>"
+        let userMessage = "\(userMessagePrefix) this transcript:\n<transcript>\n\(rawText)\n</transcript>"
         let body = GenerateRequest(
             systemInstruction: .init(parts: [.init(text: systemPrompt)]),
             contents: [.init(parts: [.init(text: userMessage)], role: "user")],
