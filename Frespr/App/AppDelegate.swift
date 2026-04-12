@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBar = MenuBarController()
-    private let coordinator = GeminiSessionCoordinator()
+    private let coordinator = TranscriptionCoordinator()
     private let overlayViewModel = OverlayViewModel()
     private var overlayWindow: OverlayWindow?
     private var hotKeyMonitor: GlobalHotKeyMonitor?
@@ -31,7 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 4. Hotkey
         let monitor = GlobalHotKeyMonitor()
         monitor.option = AppSettings.shared.hotKeyOption
+        // Toggle mode: tap once to start, tap again to stop.
+        // key-down always starts (if idle) or stops (if recording/connecting).
+        // key-up is ignored — the user taps, not holds.
         monitor.onKeyDown = { Task { @MainActor [weak self] in self?.coordinator.handleHotkeyPress() } }
+        monitor.onKeyUp   = { }  // unused in toggle mode
         monitor.onPermissionNeeded = { Task { @MainActor [weak self] in self?.handleAccessibilityPermissionNeeded() } }
         monitor.start()
         hotKeyMonitor = monitor
@@ -59,17 +63,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checker.checkIfNeeded()
         updateChecker = checker
 
-        // 7. Open Settings on first launch if no API key
-        if AppSettings.shared.geminiAPIKey.isEmpty {
+        // 7. Open Settings on first launch or migration
+        // v2.0: Deepgram is required. Show migration notice to users who only had a Gemini key.
+        let settings = AppSettings.shared
+        let needsMigration = !settings.geminiAPIKey.isEmpty
+            && settings.deepgramAPIKey.isEmpty
+            && !UserDefaults.standard.bool(forKey: "v2MigrationShown")
+        if needsMigration {
+            UserDefaults.standard.set(true, forKey: "v2MigrationShown")
+        }
+        if settings.deepgramAPIKey.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.openSettings()
+                self?.openSettings(showMigration: needsMigration)
             }
         }
     }
 
     // MARK: - State Handling
 
-    private func handleStateChange(_ state: GeminiSessionCoordinator.SessionState) {
+    private func handleStateChange(_ state: TranscriptionCoordinator.SessionState) {
         switch state {
         case .idle:
             menuBar.setIcon(.idle)
@@ -119,12 +131,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Settings
 
-    private func openSettings() {
+    private func openSettings(showMigration: Bool = false) {
         if let existing = settingsWC {
+            if showMigration { existing.showMigrationNotice = true }
             existing.showSettings()
             return
         }
         let wc = SettingsWindowController()
+        wc.showMigrationNotice = showMigration
         wc.window?.center()
         wc.onClose = { [weak self] in self?.settingsWC = nil }
         settingsWC = wc

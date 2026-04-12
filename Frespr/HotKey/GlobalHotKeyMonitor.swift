@@ -9,7 +9,8 @@ final class GlobalHotKeyMonitor {
     /// The hotkey to watch. Changing this takes effect on the next restart().
     var option: HotKeyOption = AppSettings.shared.hotKeyOption
 
-    private var eventTap: CFMachPort?
+    // Internal (not private) so the tap callback can re-enable on timeout
+    var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var retryTimer: Timer?
     private var keyDownTime: Date?
@@ -114,9 +115,22 @@ final class GlobalHotKeyMonitor {
     deinit { stop() }
 }
 
-private let globalHotKeyCallback: CGEventTapCallBack = { _, type, event, userInfo in
+private let globalHotKeyCallback: CGEventTapCallBack = { proxy, type, event, userInfo in
     guard let userInfo else { return Unmanaged.passRetained(event) }
     let monitor = Unmanaged<GlobalHotKeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+
+    // macOS silently disables event taps that time out or are blocked. Re-enable immediately
+    // so the hotkey keeps working after a long recording session or auto-stop.
+    // Raw values: kCGEventTapDisabledByTimeout = 0xFFFFFFFE, kCGEventTapDisabledByUserInput = 0xFFFFFFFF
+    let tapDisabledByTimeout   = CGEventType(rawValue: 0xFFFFFFFE)!
+    let tapDisabledByUserInput = CGEventType(rawValue: 0xFFFFFFFF)!
+    if type == tapDisabledByTimeout || type == tapDisabledByUserInput {
+        dbg("eventTap disabled by system (type=\(type.rawValue)) — re-enabling")
+        if let tap = monitor.eventTap {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+        return nil
+    }
 
     guard type == .flagsChanged else { return Unmanaged.passRetained(event) }
 

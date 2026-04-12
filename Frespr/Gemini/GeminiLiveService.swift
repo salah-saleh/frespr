@@ -1,3 +1,6 @@
+// GeminiLiveService — retained for potential future re-enablement.
+// As of v2.0, Deepgram is the sole transcription backend.
+// This class is NOT instantiated in the current session flow.
 import Foundation
 import Network
 
@@ -84,11 +87,11 @@ enum GeminiLiveError: Error, LocalizedError {
 // the new activity window opens.
 
 @MainActor
-final class GeminiLiveService {
+final class GeminiLiveService: TranscriptionBackend {
     var onTranscriptUpdate: ((String, Bool) -> Void)?
     var onSetupComplete: (() -> Void)?
     var onModelTurnComplete: (() -> Void)?
-    var onError: ((GeminiLiveError) -> Void)?
+    var onError: ((Error) -> Void)?
     var onDisconnected: (() -> Void)?
 
     private var connection: NWConnection?
@@ -319,8 +322,21 @@ final class GeminiLiveService {
     /// Exposed so the coordinator can grab it at key-release time.
     var currentTurnTranscript: String { transcriptAccumulator }
 
+    /// TranscriptionBackend conformance — maps to currentTurnTranscript.
+    var currentPartialTranscript: String { transcriptAccumulator }
+
     private var audioChunksSent = 0
+
+    /// TranscriptionBackend conformance — base64-encodes raw PCM then delegates to sendAudioChunk(base64:).
+    func sendAudioChunk(data: Data) {
+        sendAudioChunkBase64(data.base64EncodedString())
+    }
+
     func sendAudioChunk(base64: String) {
+        sendAudioChunkBase64(base64)
+    }
+
+    private func sendAudioChunkBase64(_ base64: String) {
         guard isConnected else { return }
         audioChunksSent += 1
         if audioChunksSent == 1 || audioChunksSent % 10 == 0 {

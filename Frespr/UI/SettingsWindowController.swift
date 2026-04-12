@@ -1,47 +1,135 @@
 import AppKit
 
-final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+// MARK: - SettingsWindowController
+//
+// Pure-AppKit settings window. No SwiftUI — required so text fields accept
+// keyboard input without switching activation policy tricks beyond the one
+// already in showSettings() / windowWillClose(_:).
+//
+// Layout approach: a scrolling NSStackView containing card-style NSBox sections.
+// Each section is a rounded box with a subtle fill, containing its own vertical
+// NSStackView of rows. This gives clear visual grouping without a sidebar.
+//
+// All action handlers, delegate methods, and data-loading logic are unchanged
+// from the previous implementation — only buildUI() and the window size changed.
+
+final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate {
 
     var onClose: (() -> Void)?
 
+    /// Set to true before calling showSettings() to display the v2.0 migration banner.
+    var showMigrationNotice: Bool = false
+
+    // MARK: - Design tokens
+
+    // Brand blue used for section headers and active accents
+    private static let brandBlue = NSColor(red: 0.357, green: 0.612, blue: 0.965, alpha: 1)
+    // Card background — slightly lighter than window bg
+    private static let cardBg    = NSColor(white: 1, alpha: 0.04)
+    // Separator color inside cards
+    private static let cardSep   = NSColor(white: 1, alpha: 0.07)
+    // Window background
+    private static let windowBg  = NSColor(red: 0.043, green: 0.067, blue: 0.110, alpha: 1)
+
+    // MARK: - Subviews
+
+    private let migrationBanner: NSView = {
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor(red: 0.8, green: 0.6, blue: 0.1, alpha: 0.18).cgColor
+        container.layer?.cornerRadius = 10
+        let icon = NSImageView()
+        icon.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
+        icon.contentTintColor = NSColor(red: 1.0, green: 0.85, blue: 0.4, alpha: 1)
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.widthAnchor.constraint(equalToConstant: 16).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        let label = NSTextField(wrappingLabelWithString:
+            "Frespr now uses Deepgram for transcription — faster and more accurate. " +
+            "Your Gemini key still works for post-processing. " +
+            "Add a free Deepgram API key below to continue recording.")
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = NSColor(red: 1.0, green: 0.85, blue: 0.4, alpha: 1)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        let hStack = NSStackView(views: [icon, label])
+        hStack.orientation = .horizontal
+        hStack.alignment = .top
+        hStack.spacing = 8
+        hStack.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(hStack)
+        NSLayoutConstraint.activate([
+            hStack.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
+            hStack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12),
+            hStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 14),
+            hStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14),
+        ])
+        return container
+    }()
+
+    // API key fields
     private let apiKeyField    = NSTextField()
     private let apiKeyStatus   = NSImageView()
     private let apiKeyEditBtn  = NSButton()
     private var apiKeyIsEditing = false
+    private var silenceMouseMonitor: Any?  // local mouse-down monitor to commit timeout field on outside click
+    private let dgKeyField     = NSTextField()
+    private let dgKeyStatus    = NSImageView()
+    private let dgKeyEditBtn   = NSButton()
+    private var dgKeyIsEditing  = false
+    private let dgBackendLabel: NSTextField = {
+        let tf = NSTextField(labelWithString: "")
+        tf.font = .systemFont(ofSize: 11)
+        tf.textColor = .secondaryLabelColor
+        return tf
+    }()
+
+    // Silence detection
     private let silenceCheck     = NSButton(checkboxWithTitle: "Auto-stop after silence", target: nil, action: nil)
     private let silenceTimeout   = NSTextField()
     private let silenceTimeoutStepper = NSStepper()
     private let silenceTimeoutLabel   = NSTextField(labelWithString: "seconds")
+
+    // Post-processing
     private let ppNoneRadio      = NSButton(radioButtonWithTitle: PostProcessingMode.none.displayName,      target: nil, action: nil)
     private let ppCleanupRadio   = NSButton(radioButtonWithTitle: PostProcessingMode.cleanup.displayName,   target: nil, action: nil)
     private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
     private let ppCustomRadio    = NSButton(radioButtonWithTitle: PostProcessingMode.custom.displayName,    target: nil, action: nil)
     private let ppCustomField    = NSTextField()
+
+    // Hotkey
     private let hotKeyPopup      = NSPopUpButton()
+
+    // Output
     private let clipboardCheck   = NSButton(checkboxWithTitle: "Copy transcript to clipboard", target: nil, action: nil)
-    private let soundCheck       = NSButton(checkboxWithTitle: "Sound feedback (start/stop/success beeps)", target: nil, action: nil)
-    private let translationCheck = NSButton(checkboxWithTitle: "Translate transcription", target: nil, action: nil)
+    private let soundCheck       = NSButton(checkboxWithTitle: "Sound feedback (start / stop / success)", target: nil, action: nil)
+
+    // Translation
+    private let translationCheck = NSButton(checkboxWithTitle: "Translate transcription before injecting", target: nil, action: nil)
     private let translationSourcePopup = NSPopUpButton()
     private let translationTargetPopup = NSPopUpButton()
-    private let favoritesStack   = NSStackView()   // rebuilt each time favorites change
+    private let favoritesStack   = NSStackView()
     private let addFavPopup      = NSPopUpButton()
-    private let micRow           = PermissionRowView(label: "Microphone")
-    private let axRow            = PermissionRowView(label: "Accessibility (text injection)")
+
+    // Permissions
+    private let micRow = PermissionRowView(label: "Microphone")
+    private let axRow  = PermissionRowView(label: "Accessibility  (hotkey + text injection)")
+
+    // MARK: - Init
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 720),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 440, height: 400)
-        window.maxSize = NSSize(width: 440, height: 1200)
-        window.title = "Frespr Settings"
+        window.minSize  = NSSize(width: 560, height: 420)
+        window.maxSize  = NSSize(width: 560, height: 1400)
+        window.title    = "Frespr Settings"
         window.isReleasedWhenClosed = false
         window.appearance = NSAppearance(named: .darkAqua)
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(red: 0.043, green: 0.067, blue: 0.110, alpha: 1) // #0b1120
+        window.backgroundColor = SettingsWindowController.windowBg
         self.init(window: window)
         window.delegate = self
         buildUI()
@@ -53,12 +141,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private func buildUI() {
         guard let content = window?.contentView else { return }
 
-        // Scroll view wrapping the entire settings stack
+        // Outer scroll view fills the window
         let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
+        scrollView.hasVerticalScroller   = true
         scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-        scrollView.drawsBackground = false
+        scrollView.autohidesScrollers    = true
+        scrollView.drawsBackground       = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(scrollView)
         NSLayoutConstraint.activate([
@@ -68,135 +156,189 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             scrollView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
 
-        // Stack view is the document view inside the scroll view
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 0
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.documentView = stack
-
-        // Pin stack width to scroll view width so it doesn't scroll horizontally
+        // Root stack — vertical, one card per section, fills scroll view width.
+        // alignment = .leading + explicit trailing constraints on each card (added below via padded()).
+        let root = NSStackView()
+        root.orientation = .vertical
+        root.alignment   = .leading
+        root.spacing     = 12
+        root.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.documentView = root
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            root.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            root.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            root.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
         ])
 
-        let p: CGFloat = 20
+        let pad: CGFloat = 20  // outer horizontal padding
 
-        // Helper: padded row
-        func row(_ view: NSView, top: CGFloat = 0) -> NSView {
-            let container = NSView()
-            container.translatesAutoresizingMaskIntoConstraints = false
+        // Convenience: wrap a view in a full-width padded container.
+        // The container itself is pinned to root's full width via a widthAnchor after being added,
+        // so cards always fill the scroll view horizontally.
+        func padded(_ view: NSView, top: CGFloat = 0, bottom: CGFloat = 0) -> NSView {
+            let c = NSView()
+            c.translatesAutoresizingMaskIntoConstraints = false
             view.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(view)
+            c.addSubview(view)
             NSLayoutConstraint.activate([
-                view.topAnchor.constraint(equalTo: container.topAnchor, constant: top),
-                view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8),
-                view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: p),
-                view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -p),
+                view.topAnchor.constraint(equalTo: c.topAnchor, constant: top),
+                view.bottomAnchor.constraint(equalTo: c.bottomAnchor, constant: -bottom),
+                view.leadingAnchor.constraint(equalTo: c.leadingAnchor, constant: pad),
+                view.trailingAnchor.constraint(equalTo: c.trailingAnchor, constant: -pad),
             ])
-            return container
+            return c
         }
 
-        // ── API Key ──────────────────────────────────────────────────
-        let keyHeader = sectionHeader("Gemini API Key")
-        stack.addArrangedSubview(row(keyHeader, top: p))
+        // After adding a padded container to root, bind its width to the scroll content view
+        // so it fills full width regardless of content size.
+        func pinWidth(_ container: NSView) {
+            container.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor).isActive = true
+        }
 
-        apiKeyField.placeholderString = "Paste your API key here"
-        apiKeyField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        apiKeyField.bezelStyle = .roundedBezel
-        apiKeyField.cell?.usesSingleLineMode = true
-        apiKeyField.cell?.isScrollable = true
+        // ── Migration banner ───────────────────────────────────────────
+        migrationBanner.translatesAutoresizingMaskIntoConstraints = false
+        migrationBanner.isHidden = true
+        let bannerContainer = padded(migrationBanner, top: pad, bottom: 0)
+        // Hide the container too so it takes no space when banner is not needed
+        bannerContainer.isHidden = true
+        root.addArrangedSubview(bannerContainer)
+        pinWidth(bannerContainer)
+
+        // ── Deepgram API Key card (required) ───────────────────────────
+        let dgCard = makeCard()
+        let dgInner = cardStack(in: dgCard)
+
+        // Header row: title + subtitle on left, "Get a key →" link on right (hidden when key set)
+        let dgLinkBtn = makeLinkButton(title: "Get a free key →", action: #selector(openDeepgramConsole))
+
+        let dgHeaderRow = makeCardHeaderRow(
+            title: "Deepgram API Key",
+            subtitle: "Required — real-time transcription",
+            accessory: dgLinkBtn
+        )
+        dgInner.addArrangedSubview(dgHeaderRow)
+        dgInner.addArrangedSubview(cardSeparator())
+
+        // Key input row
+        dgKeyField.placeholderString = "Paste your Deepgram API key"
+        styleKeyField(dgKeyField)
+        dgKeyField.target = self
+        dgKeyField.action = #selector(dgKeySavePressed)
+
+        styleKeyStatus(dgKeyStatus)
+        styleKeyEditButton(dgKeyEditBtn, action: #selector(dgKeyEditPressed))
+
+        let dgKeyRow = NSStackView(views: [dgKeyField, dgKeyStatus, dgKeyEditBtn])
+        dgKeyRow.orientation = .horizontal
+        dgKeyRow.spacing = 8
+        dgInner.addArrangedSubview(dgKeyRow)
+
+        // Status label (Active / Add key above)
+        dgBackendLabel.translatesAutoresizingMaskIntoConstraints = false
+        dgInner.addArrangedSubview(dgBackendLabel)
+
+        let dgContainer = padded(dgCard, top: 0, bottom: 0)
+        root.addArrangedSubview(dgContainer)
+        pinWidth(dgContainer)
+
+        // ── Gemini API Key card (optional) ─────────────────────────────
+        let gemCard = makeCard()
+        let gemInner = cardStack(in: gemCard)
+
+        let gemLinkBtn = makeLinkButton(title: "Get a free key →", action: #selector(openAIStudio))
+
+        let gemHeaderRow = makeCardHeaderRow(
+            title: "Gemini API Key",
+            subtitle: "Optional — enables post-processing & translation",
+            accessory: gemLinkBtn
+        )
+        gemInner.addArrangedSubview(gemHeaderRow)
+        gemInner.addArrangedSubview(cardSeparator())
+
+        apiKeyField.placeholderString = "Paste your Gemini API key"
+        styleKeyField(apiKeyField)
         apiKeyField.target = self
         apiKeyField.action = #selector(apiKeySavePressed)
 
-        apiKeyStatus.translatesAutoresizingMaskIntoConstraints = false
-        apiKeyStatus.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        apiKeyStatus.heightAnchor.constraint(equalToConstant: 18).isActive = true
+        styleKeyStatus(apiKeyStatus)
+        styleKeyEditButton(apiKeyEditBtn, action: #selector(apiKeyEditPressed))
 
-        apiKeyEditBtn.bezelStyle = .rounded
-        apiKeyEditBtn.controlSize = .small
-        apiKeyEditBtn.target = self
-        apiKeyEditBtn.action = #selector(apiKeyEditPressed)
+        let gemKeyRow = NSStackView(views: [apiKeyField, apiKeyStatus, apiKeyEditBtn])
+        gemKeyRow.orientation = .horizontal
+        gemKeyRow.spacing = 8
+        gemInner.addArrangedSubview(gemKeyRow)
 
-        let keyRow = NSStackView(views: [apiKeyField, apiKeyStatus, apiKeyEditBtn])
-        keyRow.orientation = .horizontal
-        keyRow.spacing = 8
-        keyRow.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(keyRow))
+        let gemContainer = padded(gemCard, top: 0, bottom: 0)
+        root.addArrangedSubview(gemContainer)
+        pinWidth(gemContainer)
 
-        let linkBtn = NSButton(title: "", target: self, action: #selector(openAIStudio))
-        linkBtn.bezelStyle = .inline
-        linkBtn.isBordered = false
-        linkBtn.attributedTitle = NSAttributedString(
-            string: "Get a free key at Google AI Studio →",
-            attributes: [.foregroundColor: NSColor.linkColor,
-                         .font: NSFont.systemFont(ofSize: 11),
-                         .underlineStyle: NSUnderlineStyle.single.rawValue])
-        stack.addArrangedSubview(row(linkBtn))
+        // ── Hotkey + Silence card ──────────────────────────────────────
+        let inputCard = makeCard()
+        let inputInner = cardStack(in: inputCard)
 
-        stack.addArrangedSubview(divider())
+        inputInner.addArrangedSubview(makeCardHeader(title: "Recording"))
+        inputInner.addArrangedSubview(cardSeparator())
 
-        // ── Silence Detection ────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Silence Detection"), top: 12))
+        // Hotkey row
+        let hotkeyLabel = makeRowLabel("Hotkey")
+        for option in HotKeyOption.allCases { hotKeyPopup.addItem(withTitle: option.label) }
+        hotKeyPopup.target = self; hotKeyPopup.action = #selector(hotKeyChanged)
+        hotKeyPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
+        let hotkeyRow = NSStackView(views: [hotkeyLabel, hotKeyPopup])
+        hotkeyRow.orientation = .horizontal
+        hotkeyRow.spacing = 8
+        // Label hugs left, popup hugs right
+        hotkeyLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        hotKeyPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        inputInner.addArrangedSubview(hotkeyRow)
+
+        let hotkeyNote = makeNote("Fn/Globe requires System Settings → Keyboard → Press Globe key → Do Nothing")
+        inputInner.addArrangedSubview(hotkeyNote)
+
+        inputInner.addArrangedSubview(cardSeparator())
+
+        // Silence detection row
         silenceCheck.target = self; silenceCheck.action = #selector(silenceCheckChanged)
-        stack.addArrangedSubview(row(silenceCheck))
+        inputInner.addArrangedSubview(silenceCheck)
 
-        // "Stop after [15] seconds" row
         silenceTimeout.bezelStyle = .roundedBezel
-        silenceTimeout.alignment = .center
-        silenceTimeout.font = .systemFont(ofSize: 13)
-        silenceTimeout.widthAnchor.constraint(equalToConstant: 44).isActive = true
-        silenceTimeout.target = self; silenceTimeout.action = #selector(silenceTimeoutChanged)
+        silenceTimeout.alignment  = .center
+        silenceTimeout.font       = .systemFont(ofSize: 13)
+        silenceTimeout.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        silenceTimeout.target     = self
+        silenceTimeout.action     = #selector(silenceTimeoutChanged)
+        silenceTimeout.delegate   = self
 
-        silenceTimeoutStepper.minValue = 5; silenceTimeoutStepper.maxValue = 60
-        silenceTimeoutStepper.increment = 1; silenceTimeoutStepper.valueWraps = false
+        silenceTimeoutStepper.minValue    = 5
+        silenceTimeoutStepper.maxValue    = 60
+        silenceTimeoutStepper.increment   = 1
+        silenceTimeoutStepper.valueWraps  = false
         silenceTimeoutStepper.target = self; silenceTimeoutStepper.action = #selector(silenceStepperChanged(_:))
 
-        let silenceRow = NSStackView(views: [
-            NSTextField(labelWithString: "Stop after"),
-            silenceTimeout,
-            silenceTimeoutStepper,
-            silenceTimeoutLabel
-        ])
+        let silenceLabel = makeRowLabel("Stop after")
+        let silenceRow = NSStackView(views: [silenceLabel, silenceTimeout, silenceTimeoutStepper, silenceTimeoutLabel])
         silenceRow.orientation = .horizontal
         silenceRow.spacing = 6
-        stack.addArrangedSubview(row(silenceRow))
+        inputInner.addArrangedSubview(silenceRow)
 
-        stack.addArrangedSubview(divider())
+        let inputContainer = padded(inputCard, top: 0, bottom: 0)
+        root.addArrangedSubview(inputContainer)
+        pinWidth(inputContainer)
 
-        // ── Hotkey ───────────────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Hotkey"), top: 12))
+        // ── Post-processing card ───────────────────────────────────────
+        let ppCard = makeCard()
+        let ppInner = cardStack(in: ppCard)
 
-        for option in HotKeyOption.allCases {
-            hotKeyPopup.addItem(withTitle: option.label)
-        }
-        hotKeyPopup.target = self; hotKeyPopup.action = #selector(hotKeyChanged)
-        stack.addArrangedSubview(row(hotKeyPopup))
+        ppInner.addArrangedSubview(makeCardHeader(title: "Post-processing"))
+        ppInner.addArrangedSubview(cardSeparator())
 
-        let hotKeyNote = NSTextField(wrappingLabelWithString: "Hold to record, release to inject. Fn/Globe requires System Settings → Keyboard → \"Press Globe key\" → \"Do Nothing\".")
-        hotKeyNote.font = .systemFont(ofSize: 11)
-        hotKeyNote.textColor = .secondaryLabelColor
-        hotKeyNote.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(hotKeyNote))
-
-        stack.addArrangedSubview(divider())
-
-        // ── Post-processing ──────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Post-processing"), top: 12))
-
-        let ppNote = NSTextField(wrappingLabelWithString: "Optionally refine the transcript with Gemini before injecting. Adds ~1–2 seconds.")
-        ppNote.font = .systemFont(ofSize: 11)
-        ppNote.textColor = .secondaryLabelColor
-        ppNote.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(ppNote))
+        let ppNote = makeNote("Optionally refine the transcript with Gemini before injecting. Requires a Gemini key.")
+        ppInner.addArrangedSubview(ppNote)
 
         for btn in [ppNoneRadio, ppCleanupRadio, ppSummarizeRadio, ppCustomRadio] {
             btn.target = self; btn.action = #selector(ppModeChanged(_:))
-            stack.addArrangedSubview(row(btn))
+            ppInner.addArrangedSubview(btn)
         }
 
         ppCustomField.placeholderString = "Enter your custom prompt…"
@@ -205,111 +347,108 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         ppCustomField.cell?.usesSingleLineMode = false
         ppCustomField.cell?.wraps = true
         ppCustomField.cell?.isScrollable = false
-        ppCustomField.heightAnchor.constraint(equalToConstant: 56).isActive = true
-        ppCustomField.target = self; ppCustomField.action = #selector(ppCustomPromptChanged)
-        stack.addArrangedSubview(row(ppCustomField))
+        ppCustomField.heightAnchor.constraint(equalToConstant: 60).isActive = true
+        ppCustomField.target   = self
+        ppCustomField.action   = #selector(ppCustomPromptChanged)
+        ppCustomField.delegate = self
+        ppInner.addArrangedSubview(ppCustomField)
 
-        stack.addArrangedSubview(divider())
+        let ppContainer = padded(ppCard, top: 0, bottom: 0)
+        root.addArrangedSubview(ppContainer)
+        pinWidth(ppContainer)
 
-        // ── Output ───────────────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Output"), top: 12))
+        // ── Output card ────────────────────────────────────────────────
+        let outputCard = makeCard()
+        let outputInner = cardStack(in: outputCard)
+
+        outputInner.addArrangedSubview(makeCardHeader(title: "Output"))
+        outputInner.addArrangedSubview(cardSeparator())
 
         clipboardCheck.target = self; clipboardCheck.action = #selector(clipboardCheckChanged)
-        stack.addArrangedSubview(row(clipboardCheck))
+        outputInner.addArrangedSubview(clipboardCheck)
 
         soundCheck.target = self; soundCheck.action = #selector(soundCheckChanged)
-        stack.addArrangedSubview(row(soundCheck))
+        outputInner.addArrangedSubview(soundCheck)
 
-        stack.addArrangedSubview(divider())
+        let outputContainer = padded(outputCard, top: 0, bottom: 0)
+        root.addArrangedSubview(outputContainer)
+        pinWidth(outputContainer)
 
-        // ── Translation ──────────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Translation"), top: 12))
+        // ── Translation card ───────────────────────────────────────────
+        let transCard = makeCard()
+        let transInner = cardStack(in: transCard)
+
+        transInner.addArrangedSubview(makeCardHeader(title: "Translation"))
+        transInner.addArrangedSubview(cardSeparator())
 
         translationCheck.target = self; translationCheck.action = #selector(translationCheckChanged)
-        stack.addArrangedSubview(row(translationCheck))
+        transInner.addArrangedSubview(translationCheck)
 
-        // "Speak in" row
+        transInner.addArrangedSubview(cardSeparator())
+
+        // Speak in row
         translationSourcePopup.addItem(withTitle: "Auto-detect")
         translationSourcePopup.menu?.addItem(.separator())
         for lang in kSupportedLanguages { translationSourcePopup.addItem(withTitle: lang) }
         translationSourcePopup.target = self; translationSourcePopup.action = #selector(translationSourceChanged)
+        let speakInRow = makeLabelPopupRow("Speak in", popup: translationSourcePopup)
+        transInner.addArrangedSubview(speakInRow)
 
-        let speakInLabel = NSTextField(labelWithString: "Speak in")
-        speakInLabel.font = .systemFont(ofSize: 13)
-        let sourceRow = NSStackView(views: [speakInLabel, translationSourcePopup])
-        sourceRow.orientation = .horizontal; sourceRow.spacing = 10
-        stack.addArrangedSubview(row(sourceRow))
-
-        // "Translate to" row
+        // Translate to row
         for lang in kSupportedLanguages { translationTargetPopup.addItem(withTitle: lang) }
         translationTargetPopup.target = self; translationTargetPopup.action = #selector(translationTargetChanged)
+        let translateToRow = makeLabelPopupRow("Translate to", popup: translationTargetPopup)
+        transInner.addArrangedSubview(translateToRow)
 
-        let translateToLabel = NSTextField(labelWithString: "Translate to")
-        translateToLabel.font = .systemFont(ofSize: 13)
-        let targetRow = NSStackView(views: [translateToLabel, translationTargetPopup])
-        targetRow.orientation = .horizontal; targetRow.spacing = 10
-        stack.addArrangedSubview(row(targetRow))
+        transInner.addArrangedSubview(cardSeparator())
 
-        // "Quick-switch languages" sub-header + favorites management
-        let favsHeader = NSTextField(labelWithString: "Quick-switch languages")
-        favsHeader.font = .systemFont(ofSize: 12, weight: .medium)
-        favsHeader.textColor = .secondaryLabelColor
-        stack.addArrangedSubview(row(favsHeader))
+        // Favorites
+        let favsHeader = makeRowLabel("Quick-switch languages")
+        transInner.addArrangedSubview(favsHeader)
 
-        // Stack of favorite rows (rebuilt dynamically)
         favoritesStack.orientation = .vertical
-        favoritesStack.alignment = .leading
-        favoritesStack.spacing = 4
+        favoritesStack.alignment   = .leading
+        favoritesStack.spacing     = 4
         favoritesStack.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(favoritesStack))
+        transInner.addArrangedSubview(favoritesStack)
 
-        // "Add" popup
         addFavPopup.target = self; addFavPopup.action = #selector(addFavorite)
         addFavPopup.bezelStyle = .rounded
         addFavPopup.controlSize = .small
-        stack.addArrangedSubview(row(addFavPopup))
+        transInner.addArrangedSubview(addFavPopup)
 
-        let favsNote = NSTextField(wrappingLabelWithString: "Up to 6 favorites. Click the translation pill during recording to cycle through them.")
-        favsNote.font = .systemFont(ofSize: 11)
-        favsNote.textColor = .tertiaryLabelColor
-        favsNote.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(favsNote))
+        let favsNote = makeNote("Up to 6 favorites. Click the translation pill during recording to cycle through them.")
+        transInner.addArrangedSubview(favsNote)
 
-        let transNote = NSTextField(wrappingLabelWithString: "Transcribed audio is translated before being injected. Adds ~1–2 seconds.")
-        transNote.font = .systemFont(ofSize: 11)
-        transNote.textColor = .secondaryLabelColor
-        transNote.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(transNote))
+        let transContainer = padded(transCard, top: 0, bottom: 0)
+        root.addArrangedSubview(transContainer)
+        pinWidth(transContainer)
 
-        stack.addArrangedSubview(divider())
+        // ── Permissions card ───────────────────────────────────────────
+        let permCard = makeCard()
+        let permInner = cardStack(in: permCard)
 
-        // ── Permissions ──────────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Permissions"), top: 12))
+        permInner.addArrangedSubview(makeCardHeader(title: "Permissions"))
+        permInner.addArrangedSubview(cardSeparator())
 
-        let permNote = NSTextField(wrappingLabelWithString: "Accessibility is required for the hotkey and text injection. Microphone is required for recording.")
-        permNote.font = .systemFont(ofSize: 11)
-        permNote.textColor = .secondaryLabelColor
-        permNote.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(permNote))
+        permInner.addArrangedSubview(micRow)
+        permInner.addArrangedSubview(cardSeparator())
+        permInner.addArrangedSubview(axRow)
 
-        stack.addArrangedSubview(row(micRow))
-        stack.addArrangedSubview(row(axRow))
+        let permContainer = padded(permCard, top: 0, bottom: 0)
+        root.addArrangedSubview(permContainer)
+        pinWidth(permContainer)
 
-        // ── Version footer ───────────────────────────────────────────
+        // ── Version footer ─────────────────────────────────────────────
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         let versionLabel = NSTextField(labelWithString: "Frespr \(version) (\(build))")
-        versionLabel.font = .systemFont(ofSize: 10)
+        versionLabel.font      = .systemFont(ofSize: 10)
         versionLabel.textColor = .tertiaryLabelColor
         versionLabel.alignment = .center
-        versionLabel.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(versionLabel, top: 4))
-
-        // Bottom padding
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.heightAnchor.constraint(equalToConstant: 8).isActive = true
-        stack.addArrangedSubview(spacer)
+        let footerContainer = padded(versionLabel, top: 4, bottom: 16)
+        root.addArrangedSubview(footerContainer)
+        pinWidth(footerContainer)
 
         refreshPermissions()
 
@@ -321,6 +460,154 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         )
     }
 
+    // MARK: - Card building helpers
+
+    /// Creates a rounded card NSBox with the standard background and border.
+    private func makeCard() -> NSBox {
+        let box = NSBox()
+        box.boxType         = .custom
+        box.fillColor       = SettingsWindowController.cardBg
+        box.borderColor     = NSColor(white: 1, alpha: 0.08)
+        box.borderWidth     = 1
+        box.cornerRadius    = 12
+        box.translatesAutoresizingMaskIntoConstraints = false
+        return box
+    }
+
+    /// Creates a vertical NSStackView pinned to the card's content view with standard insets.
+    /// alignment = .left; rows fill width because they are pinned leading+trailing to the card.
+    private func cardStack(in card: NSBox) -> NSStackView {
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment   = .leading
+        stack.spacing     = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+        ])
+        return stack
+    }
+
+    /// A thin horizontal separator line inside a card.
+    /// With cardStack alignment = .fill this stretches automatically to full card width.
+    private func cardSeparator() -> NSView {
+        let line = NSView()
+        line.wantsLayer = true
+        line.layer?.backgroundColor = SettingsWindowController.cardSep.cgColor
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return line
+    }
+
+    /// Simple section header label inside a card.
+    private func makeCardHeader(title: String) -> NSTextField {
+        let tf = NSTextField(labelWithString: title)
+        tf.font      = .systemFont(ofSize: 13, weight: .semibold)
+        tf.textColor = .labelColor
+        return tf
+    }
+
+    /// Card header row: title+subtitle stack on left, optional accessory view on right.
+    private func makeCardHeaderRow(title: String, subtitle: String, accessory: NSView?) -> NSView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font      = .systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.textColor = .labelColor
+
+        let subLabel = NSTextField(labelWithString: subtitle)
+        subLabel.font      = .systemFont(ofSize: 11)
+        subLabel.textColor = .secondaryLabelColor
+
+        let titleStack = NSStackView(views: [titleLabel, subLabel])
+        titleStack.orientation = .vertical
+        titleStack.alignment   = .leading
+        titleStack.spacing     = 2
+
+        if let acc = accessory {
+            let row = NSStackView(views: [titleStack, NSView(), acc])
+            row.orientation = .horizontal
+            row.spacing     = 8
+            row.alignment   = .centerY
+            if let spacer = row.arrangedSubviews[1] as NSView? {
+                spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            }
+            return row
+        } else {
+            return titleStack
+        }
+    }
+
+    /// Small secondary label used as a row prefix.
+    private func makeRowLabel(_ text: String) -> NSTextField {
+        let tf = NSTextField(labelWithString: text)
+        tf.font      = .systemFont(ofSize: 13)
+        tf.textColor = .labelColor
+        return tf
+    }
+
+    /// Dim helper note text below a control.
+    private func makeNote(_ text: String) -> NSTextField {
+        let tf = NSTextField(wrappingLabelWithString: text)
+        tf.font      = .systemFont(ofSize: 11)
+        tf.textColor = .tertiaryLabelColor
+        tf.translatesAutoresizingMaskIntoConstraints = false
+        return tf
+    }
+
+    /// Inline link-style button.
+    private func makeLinkButton(title: String, action: Selector) -> NSButton {
+        let btn = NSButton(title: "", target: self, action: action)
+        btn.bezelStyle  = .inline
+        btn.isBordered  = false
+        btn.attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [
+                .foregroundColor: NSColor.linkColor,
+                .font: NSFont.systemFont(ofSize: 11),
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+            ])
+        return btn
+    }
+
+    /// Label + popup button in a horizontal row, label left, popup stretches right.
+    private func makeLabelPopupRow(_ labelText: String, popup: NSPopUpButton) -> NSView {
+        let label = makeRowLabel(labelText)
+        label.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        popup.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let row = NSStackView(views: [label, popup])
+        row.orientation = .horizontal
+        row.spacing     = 8
+        row.alignment   = .centerY
+        return row
+    }
+
+    // MARK: - Key field helpers
+
+    private func styleKeyField(_ field: NSTextField) {
+        field.font             = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        field.bezelStyle       = .roundedBezel
+        field.cell?.usesSingleLineMode = true
+        field.cell?.isScrollable       = true
+    }
+
+    private func styleKeyStatus(_ view: NSImageView) {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        view.heightAnchor.constraint(equalToConstant: 18).isActive = true
+    }
+
+    private func styleKeyEditButton(_ btn: NSButton, action: Selector) {
+        btn.bezelStyle   = .rounded
+        btn.controlSize  = .small
+        btn.target       = self
+        btn.action       = action
+    }
+
+    // MARK: - Notification handler
+
     @objc private func externalTranslationChanged() {
         let s = AppSettings.shared
         translationCheck.state = s.translationEnabled ? .on : .off
@@ -331,52 +618,44 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         updateTranslationRowsEnabled()
     }
 
-    private func sectionHeader(_ title: String) -> NSTextField {
-        let tf = NSTextField(labelWithString: title.uppercased())
-        tf.font = .systemFont(ofSize: 10, weight: .bold)
-        tf.textColor = NSColor(red: 0.357, green: 0.612, blue: 0.965, alpha: 1) // brand blue #5b9cf6
-        return tf
-    }
-
-    private func divider() -> NSView {
-        let box = NSBox()
-        box.boxType = .separator
-        box.translatesAutoresizingMaskIntoConstraints = false
-        // Wrap in a container with horizontal padding
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(box)
-        NSLayoutConstraint.activate([
-            box.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
-            box.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8),
-            box.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-            box.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
-            box.heightAnchor.constraint(equalToConstant: 1),
-        ])
-        return container
-    }
-
     // MARK: - Values
 
     private func loadValues() {
         let s = AppSettings.shared
+
+        // Gemini key
         let key = s.geminiAPIKey
         apiKeyField.stringValue = key
         updateAPIKeyStatus(key: key)
-        setAPIKeyEditing(key.isEmpty)  // start in edit mode only if no key yet
+        setAPIKeyEditing(key.isEmpty)
+
+        // Deepgram key
+        let dgKey = s.deepgramAPIKey
+        updateDGKeyStatus(key: dgKey)
+        setDGKeyEditing(dgKey.isEmpty)
+        updateDGBackendLabel()
+
+        // Silence
         silenceCheck.state = s.silenceDetectionEnabled ? .on : .off
         silenceTimeout.integerValue = s.silenceTimeoutSeconds
         silenceTimeoutStepper.integerValue = s.silenceTimeoutSeconds
         updateSilenceRowEnabled()
+
+        // Post-processing
         updatePPRadios(mode: s.postProcessingMode)
         ppCustomField.stringValue = s.customPostProcessingPrompt
         updatePPCustomFieldVisibility()
-        let currentOption = s.hotKeyOption
-        if let idx = HotKeyOption.allCases.firstIndex(of: currentOption) {
+
+        // Hotkey
+        if let idx = HotKeyOption.allCases.firstIndex(of: s.hotKeyOption) {
             hotKeyPopup.selectItem(at: idx)
         }
+
+        // Output
         clipboardCheck.state = s.copyToClipboard ? .on : .off
-        soundCheck.state = s.soundFeedbackEnabled ? .on : .off
+        soundCheck.state     = s.soundFeedbackEnabled ? .on : .off
+
+        // Translation
         translationCheck.state = s.translationEnabled ? .on : .off
         translationSourcePopup.selectItem(withTitle: s.translationSourceLanguage)
         if translationSourcePopup.indexOfSelectedItem < 0 { translationSourcePopup.selectItem(at: 0) }
@@ -388,9 +667,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateSilenceRowEnabled() {
         let on = AppSettings.shared.silenceDetectionEnabled
-        silenceTimeout.isEnabled = on
+        silenceTimeout.isEnabled        = on
         silenceTimeoutStepper.isEnabled = on
-        silenceTimeoutLabel.textColor = on ? .labelColor : .disabledControlTextColor
+        silenceTimeoutLabel.textColor   = on ? .labelColor : .disabledControlTextColor
     }
 
     private func updatePPRadios(mode: PostProcessingMode) {
@@ -407,37 +686,36 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func loadFavorites() {
-        // Rebuild the favoritesStack rows
-        for v in favoritesStack.arrangedSubviews { favoritesStack.removeArrangedSubview(v); v.removeFromSuperview() }
+        for v in favoritesStack.arrangedSubviews {
+            favoritesStack.removeArrangedSubview(v)
+            v.removeFromSuperview()
+        }
 
         let favs = AppSettings.shared.translationFavorites
         for (i, lang) in favs.enumerated() {
             let label = NSTextField(labelWithString: lang)
             label.font = .systemFont(ofSize: 12)
             let removeBtn = NSButton(title: "−", target: self, action: #selector(removeFavorite(_:)))
-            removeBtn.bezelStyle = .rounded
+            removeBtn.bezelStyle  = .rounded
             removeBtn.controlSize = .small
             removeBtn.tag = i
-            let favRow = NSStackView(views: [label, NSView(), removeBtn])  // spacer pushes btn right
+            let favRow = NSStackView(views: [label, NSView(), removeBtn])
             favRow.orientation = .horizontal
-            favRow.spacing = 6
+            favRow.spacing     = 6
             favRow.translatesAutoresizingMaskIntoConstraints = false
-            // Make spacer flexible
             if let spacer = favRow.arrangedSubviews[1] as NSView? {
                 spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
             }
-            favRow.widthAnchor.constraint(equalToConstant: 360).isActive = true
             favoritesStack.addArrangedSubview(favRow)
         }
 
         if favs.isEmpty {
             let empty = NSTextField(labelWithString: "(none)")
-            empty.font = .systemFont(ofSize: 12)
+            empty.font      = .systemFont(ofSize: 12)
             empty.textColor = .tertiaryLabelColor
             favoritesStack.addArrangedSubview(empty)
         }
 
-        // Rebuild the Add popup with languages not yet in favorites
         addFavPopup.removeAllItems()
         addFavPopup.addItem(withTitle: "＋ Add language…")
         let available = kSupportedLanguages.filter { !favs.contains($0) }
@@ -463,21 +741,58 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func setAPIKeyEditing(_ editing: Bool) {
-        apiKeyIsEditing = editing
-        apiKeyField.isEditable = editing
+        apiKeyIsEditing          = editing
+        apiKeyField.isEditable   = editing
         apiKeyField.isSelectable = editing
         apiKeyField.backgroundColor = editing ? .textBackgroundColor : .controlBackgroundColor
 
         if editing {
-            // Show the raw key while editing
             apiKeyField.stringValue = AppSettings.shared.geminiAPIKey
-            apiKeyEditBtn.title = "Save"
+            apiKeyEditBtn.title     = "Save"
         } else {
-            // Show masked key when locked
             let key = AppSettings.shared.geminiAPIKey
             apiKeyField.stringValue = key.isEmpty ? "" : mask(key)
-            apiKeyEditBtn.title = "Edit"
+            apiKeyEditBtn.title     = "Edit"
         }
+    }
+
+    private func updateDGKeyStatus(key: String) {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        if key.isEmpty {
+            dgKeyStatus.image = NSImage(systemSymbolName: "circle.dashed",
+                                        accessibilityDescription: "no key")?.withSymbolConfiguration(cfg)
+            dgKeyStatus.contentTintColor = .tertiaryLabelColor
+        } else {
+            dgKeyStatus.image = NSImage(systemSymbolName: "checkmark.circle.fill",
+                                        accessibilityDescription: "key set")?.withSymbolConfiguration(cfg)
+            dgKeyStatus.contentTintColor = .systemGreen
+        }
+    }
+
+    private func setDGKeyEditing(_ editing: Bool) {
+        dgKeyIsEditing          = editing
+        dgKeyField.isEditable   = editing
+        dgKeyField.isSelectable = editing
+        dgKeyField.backgroundColor = editing ? .textBackgroundColor : .controlBackgroundColor
+
+        if editing {
+            dgKeyField.stringValue  = AppSettings.shared.deepgramAPIKey
+            dgKeyEditBtn.title      = "Save"
+        } else {
+            let key = AppSettings.shared.deepgramAPIKey
+            dgKeyField.stringValue  = key.isEmpty ? "" : mask(key)
+            dgKeyEditBtn.title      = "Edit"
+        }
+    }
+
+    private func updateDGBackendLabel() {
+        let hasDG = !AppSettings.shared.deepgramAPIKey.isEmpty
+        // v2.0: Deepgram is the sole transcription backend; no Gemini Live fallback.
+        dgBackendLabel.stringValue = hasDG
+            ? "✓  Active — nova-3, real-time streaming"
+            : "Add key above to enable transcription"
+        dgBackendLabel.textColor = hasDG ? .systemGreen : .secondaryLabelColor
+        dgBackendLabel.isHidden  = false
     }
 
     private func mask(_ key: String) -> String {
@@ -504,22 +819,46 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func apiKeyEditPressed() {
         if apiKeyIsEditing {
-            // Save
             let key = apiKeyField.stringValue
             AppSettings.shared.geminiAPIKey = key
             updateAPIKeyStatus(key: key)
             setAPIKeyEditing(false)
+            updateDGBackendLabel()
             window?.makeFirstResponder(nil)
         } else {
-            // Enter edit mode
             setAPIKeyEditing(true)
             window?.makeFirstResponder(apiKeyField)
         }
     }
 
     @objc private func apiKeySavePressed() {
-        // Return key in field triggers save
         if apiKeyIsEditing { apiKeyEditPressed() }
+    }
+
+    @objc private func dgKeyEditPressed() {
+        if dgKeyIsEditing {
+            let key = dgKeyField.stringValue
+            AppSettings.shared.deepgramAPIKey = key
+            updateDGKeyStatus(key: key)
+            setDGKeyEditing(false)
+            updateDGBackendLabel()
+            window?.makeFirstResponder(nil)
+        } else {
+            setDGKeyEditing(true)
+            window?.makeFirstResponder(dgKeyField)
+        }
+    }
+
+    @objc private func dgKeySavePressed() {
+        if dgKeyIsEditing { dgKeyEditPressed() }
+    }
+
+    @objc private func openDeepgramConsole() {
+        NSWorkspace.shared.open(URL(string: "https://console.deepgram.com/signup")!)
+    }
+
+    @objc private func openAIStudio() {
+        NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
     }
 
     @objc private func silenceCheckChanged() {
@@ -529,7 +868,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func silenceTimeoutChanged() {
         let v = max(5, min(60, silenceTimeout.integerValue))
-        silenceTimeout.integerValue = v
+        silenceTimeout.integerValue        = v
         silenceTimeoutStepper.integerValue = v
         AppSettings.shared.silenceTimeoutSeconds = v
     }
@@ -539,7 +878,36 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         AppSettings.shared.silenceTimeoutSeconds = sender.integerValue
     }
 
-    @objc private func openAIStudio() { NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!) }
+    // MARK: - NSTextFieldDelegate (silence timeout + custom prompt fields)
+
+    // Strip non-digit characters live as the user types, and sync the stepper
+    // immediately so arrows always operate on the current typed value.
+    // Also saves the custom prompt on every keystroke so it's available immediately.
+    func controlTextDidChange(_ obj: Notification) {
+        if (obj.object as? NSTextField) === ppCustomField {
+            AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
+            return
+        }
+        guard (obj.object as? NSTextField) === silenceTimeout else { return }
+        // Remove any non-digit characters in place
+        let digits = silenceTimeout.stringValue.filter { $0.isNumber }
+        if digits != silenceTimeout.stringValue {
+            silenceTimeout.stringValue = digits
+        }
+        // Sync stepper to the current raw value (no clamping yet — allow partial input)
+        if let v = Int(digits) {
+            silenceTimeoutStepper.integerValue = max(5, min(60, v))
+        }
+    }
+
+    // Clamp and save when Return is pressed (already wired via .action → silenceTimeoutChanged).
+    // Also called by controlTextDidEndEditing below.
+
+    // Save when the field loses focus for any reason (click elsewhere, tab, window close).
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard (obj.object as? NSTextField) === silenceTimeout else { return }
+        silenceTimeoutChanged()
+    }
 
     @objc private func ppModeChanged(_ sender: NSButton) {
         let mode: PostProcessingMode
@@ -559,7 +927,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func hotKeyChanged() {
-        let idx = hotKeyPopup.indexOfSelectedItem
+        let idx    = hotKeyPopup.indexOfSelectedItem
         let option = HotKeyOption.allCases[idx]
         AppSettings.shared.hotKeyOption = option
         NotificationCenter.default.post(name: .hotKeyChanged, object: nil)
@@ -613,10 +981,32 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+
+        if showMigrationNotice {
+            migrationBanner.isHidden = false
+            migrationBanner.superview?.isHidden = false
+        }
+
         DispatchQueue.main.async { [weak self] in
             guard let self, let w = self.window else { return }
-            // Only focus API key field if in edit mode (no key set yet)
-            if self.apiKeyIsEditing { w.makeFirstResponder(self.apiKeyField) }
+            if self.dgKeyIsEditing      { w.makeFirstResponder(self.dgKeyField) }
+            else if self.apiKeyIsEditing { w.makeFirstResponder(self.apiKeyField) }
+        }
+
+        // When the user clicks anywhere in the window while the silence timeout field
+        // is first responder, force it to commit before the click is processed.
+        // This ensures typing a value then clicking a checkbox registers the new value.
+        silenceMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self else { return event }
+            guard let w = self.window, let fr = w.firstResponder else { return event }
+            // fieldEditor is an NSTextView subclass; its delegate is the actual NSTextField
+            let fieldEditor = fr as? NSTextView
+            let activeField = fieldEditor?.delegate as? NSTextField ?? fr as? NSTextField
+            if activeField === self.silenceTimeout {
+                self.silenceTimeoutChanged()
+                w.makeFirstResponder(nil)
+            }
+            return event
         }
     }
 
@@ -645,10 +1035,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         if apiKeyIsEditing {
-            let key = apiKeyField.stringValue
-            AppSettings.shared.geminiAPIKey = key
+            AppSettings.shared.geminiAPIKey = apiKeyField.stringValue
+        }
+        if dgKeyIsEditing {
+            AppSettings.shared.deepgramAPIKey = dgKeyField.stringValue
         }
         AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
+        if let monitor = silenceMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            silenceMouseMonitor = nil
+        }
         NSApp.mainMenu = nil
         NSApp.setActivationPolicy(.accessory)
         onClose?()
@@ -670,10 +1066,12 @@ final class PermissionRowView: NSView {
             v.translatesAutoresizingMaskIntoConstraints = false
             addSubview(v)
         }
-        btn.title = "Grant Access"
-        btn.bezelStyle = .rounded
+        btn.title       = "Grant Access"
+        btn.bezelStyle  = .rounded
         btn.controlSize = .small
         btn.target = self; btn.action = #selector(tapped)
+
+        self.label.font = .systemFont(ofSize: 13)
 
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -681,13 +1079,13 @@ final class PermissionRowView: NSView {
             icon.widthAnchor.constraint(equalToConstant: 16),
             icon.heightAnchor.constraint(equalToConstant: 16),
 
-            self.label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+            self.label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
             self.label.centerYAnchor.constraint(equalTo: centerYAnchor),
 
             btn.trailingAnchor.constraint(equalTo: trailingAnchor),
             btn.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            heightAnchor.constraint(equalToConstant: 22),
+            heightAnchor.constraint(equalToConstant: 26),
         ])
     }
 
@@ -696,8 +1094,10 @@ final class PermissionRowView: NSView {
     func setGranted(_ granted: Bool, action: @escaping () -> Void) {
         grantAction = action
         let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        icon.image = NSImage(systemSymbolName: granted ? "checkmark.circle.fill" : "xmark.circle.fill",
-                             accessibilityDescription: nil)?.withSymbolConfiguration(cfg)
+        icon.image = NSImage(
+            systemSymbolName: granted ? "checkmark.circle.fill" : "xmark.circle.fill",
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(cfg)
         icon.contentTintColor = granted ? .systemGreen : .systemRed
         btn.isHidden = granted
     }
