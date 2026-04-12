@@ -63,10 +63,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checker.checkIfNeeded()
         updateChecker = checker
 
-        // 7. Open Settings on first launch if no API key
-        if AppSettings.shared.geminiAPIKey.isEmpty {
+        // 7. Open Settings on first launch or migration
+        // v2.0: Deepgram is required. Show migration notice to users who only had a Gemini key.
+        let settings = AppSettings.shared
+        let needsMigration = !settings.geminiAPIKey.isEmpty
+            && settings.deepgramAPIKey.isEmpty
+            && !UserDefaults.standard.bool(forKey: "v2MigrationShown")
+        if needsMigration {
+            UserDefaults.standard.set(true, forKey: "v2MigrationShown")
+        }
+        if settings.deepgramAPIKey.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.openSettings()
+                self?.openSettings(showMigration: needsMigration)
             }
         }
     }
@@ -123,12 +131,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Settings
 
-    private func openSettings() {
+    private func openSettings(showMigration: Bool = false) {
         if let existing = settingsWC {
+            if showMigration { existing.showMigrationNotice = true }
             existing.showSettings()
             return
         }
         let wc = SettingsWindowController()
+        wc.showMigrationNotice = showMigration
         wc.window?.center()
         wc.onClose = { [weak self] in self?.settingsWC = nil }
         settingsWC = wc

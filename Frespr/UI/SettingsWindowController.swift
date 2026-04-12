@@ -4,6 +4,31 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     var onClose: (() -> Void)?
 
+    /// Set to true before calling showSettings() to display the v2.0 migration banner.
+    var showMigrationNotice: Bool = false
+
+    private let migrationBanner: NSView = {
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor(red: 0.8, green: 0.6, blue: 0.1, alpha: 0.18).cgColor
+        container.layer?.cornerRadius = 8
+        let label = NSTextField(wrappingLabelWithString:
+            "Frespr now uses Deepgram for transcription — faster and more accurate. " +
+            "Your Gemini key still works for post-processing. " +
+            "Add a free Deepgram API key below to continue recording.")
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = NSColor(red: 1.0, green: 0.85, blue: 0.4, alpha: 1)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+        ])
+        return container
+    }()
+
     private let apiKeyField    = NSTextField()
     private let apiKeyStatus   = NSImageView()
     private let apiKeyEditBtn  = NSButton()
@@ -110,47 +135,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             return container
         }
 
-        // ── API Key ──────────────────────────────────────────────────
-        let keyHeader = sectionHeader("Gemini API Key")
-        stack.addArrangedSubview(row(keyHeader, top: p))
+        // ── Migration banner (hidden by default, shown for v2.0 upgraders) ──
+        migrationBanner.translatesAutoresizingMaskIntoConstraints = false
+        migrationBanner.isHidden = true
+        stack.addArrangedSubview(row(migrationBanner, top: p))
 
-        apiKeyField.placeholderString = "Paste your API key here"
-        apiKeyField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        apiKeyField.bezelStyle = .roundedBezel
-        apiKeyField.cell?.usesSingleLineMode = true
-        apiKeyField.cell?.isScrollable = true
-        apiKeyField.target = self
-        apiKeyField.action = #selector(apiKeySavePressed)
+        // ── Deepgram API Key (required) ───────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Deepgram API Key"), top: p))
 
-        apiKeyStatus.translatesAutoresizingMaskIntoConstraints = false
-        apiKeyStatus.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        apiKeyStatus.heightAnchor.constraint(equalToConstant: 18).isActive = true
-
-        apiKeyEditBtn.bezelStyle = .rounded
-        apiKeyEditBtn.controlSize = .small
-        apiKeyEditBtn.target = self
-        apiKeyEditBtn.action = #selector(apiKeyEditPressed)
-
-        let keyRow = NSStackView(views: [apiKeyField, apiKeyStatus, apiKeyEditBtn])
-        keyRow.orientation = .horizontal
-        keyRow.spacing = 8
-        keyRow.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(row(keyRow))
-
-        let linkBtn = NSButton(title: "", target: self, action: #selector(openAIStudio))
-        linkBtn.bezelStyle = .inline
-        linkBtn.isBordered = false
-        linkBtn.attributedTitle = NSAttributedString(
-            string: "Get a free key at Google AI Studio →",
-            attributes: [.foregroundColor: NSColor.linkColor,
-                         .font: NSFont.systemFont(ofSize: 11),
-                         .underlineStyle: NSUnderlineStyle.single.rawValue])
-        stack.addArrangedSubview(row(linkBtn))
-
-        stack.addArrangedSubview(divider())
-
-        // ── Deepgram API Key ─────────────────────────────────────────
-        stack.addArrangedSubview(row(sectionHeader("Deepgram API Key (optional — fast mode)"), top: p))
+        let dgRequiredLabel = NSTextField(labelWithString: "Required for transcription")
+        dgRequiredLabel.font = .systemFont(ofSize: 11)
+        dgRequiredLabel.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(row(dgRequiredLabel))
 
         dgKeyField.placeholderString = "Paste your Deepgram API key here"
         dgKeyField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
@@ -186,6 +182,50 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                          .font: NSFont.systemFont(ofSize: 11),
                          .underlineStyle: NSUnderlineStyle.single.rawValue])
         stack.addArrangedSubview(row(dgLinkBtn))
+
+        stack.addArrangedSubview(divider())
+
+        // ── Gemini API Key (optional) ────────────────────────────────
+        let keyHeader = sectionHeader("Gemini API Key")
+        stack.addArrangedSubview(row(keyHeader, top: p))
+
+        let geminiOptionalLabel = NSTextField(labelWithString: "Optional — enables post-processing & translation")
+        geminiOptionalLabel.font = .systemFont(ofSize: 11)
+        geminiOptionalLabel.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(row(geminiOptionalLabel))
+
+        apiKeyField.placeholderString = "Paste your Gemini API key here"
+        apiKeyField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        apiKeyField.bezelStyle = .roundedBezel
+        apiKeyField.cell?.usesSingleLineMode = true
+        apiKeyField.cell?.isScrollable = true
+        apiKeyField.target = self
+        apiKeyField.action = #selector(apiKeySavePressed)
+
+        apiKeyStatus.translatesAutoresizingMaskIntoConstraints = false
+        apiKeyStatus.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        apiKeyStatus.heightAnchor.constraint(equalToConstant: 18).isActive = true
+
+        apiKeyEditBtn.bezelStyle = .rounded
+        apiKeyEditBtn.controlSize = .small
+        apiKeyEditBtn.target = self
+        apiKeyEditBtn.action = #selector(apiKeyEditPressed)
+
+        let keyRow = NSStackView(views: [apiKeyField, apiKeyStatus, apiKeyEditBtn])
+        keyRow.orientation = .horizontal
+        keyRow.spacing = 8
+        keyRow.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(keyRow))
+
+        let linkBtn = NSButton(title: "", target: self, action: #selector(openAIStudio))
+        linkBtn.bezelStyle = .inline
+        linkBtn.isBordered = false
+        linkBtn.attributedTitle = NSAttributedString(
+            string: "Get a free key at Google AI Studio →",
+            attributes: [.foregroundColor: NSColor.linkColor,
+                         .font: NSFont.systemFont(ofSize: 11),
+                         .underlineStyle: NSUnderlineStyle.single.rawValue])
+        stack.addArrangedSubview(row(linkBtn))
 
         stack.addArrangedSubview(divider())
 
@@ -565,18 +605,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func updateDGBackendLabel() {
-        let s = AppSettings.shared
-        let hasDG     = !s.deepgramAPIKey.isEmpty
-        let hasGemini = !s.geminiAPIKey.isEmpty
-        if hasDG {
-            dgBackendLabel.stringValue = "Transcribing with Deepgram (fast mode)"
-            dgBackendLabel.isHidden = false
-        } else if hasGemini {
-            dgBackendLabel.stringValue = "Transcribing with Gemini Live"
-            dgBackendLabel.isHidden = false
-        } else {
-            dgBackendLabel.isHidden = true
-        }
+        let hasDG = !AppSettings.shared.deepgramAPIKey.isEmpty
+        // v2.0: Deepgram is the sole transcription backend; no Gemini Live fallback.
+        dgBackendLabel.stringValue = hasDG
+            ? "Active — nova-3, real-time streaming"
+            : "Add key above to enable transcription"
+        dgBackendLabel.isHidden = false
     }
 
     private func mask(_ key: String) -> String {
@@ -738,10 +772,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+        // Show migration banner if flagged (v2.0 upgraders who had only a Gemini key)
+        if showMigrationNotice {
+            migrationBanner.isHidden = false
+        }
+
         DispatchQueue.main.async { [weak self] in
             guard let self, let w = self.window else { return }
-            // Only focus API key field if in edit mode (no key set yet)
-            if self.apiKeyIsEditing { w.makeFirstResponder(self.apiKeyField) }
+            // Focus Deepgram field first (it's the required key in v2.0)
+            if self.dgKeyIsEditing { w.makeFirstResponder(self.dgKeyField) }
+            else if self.apiKeyIsEditing { w.makeFirstResponder(self.apiKeyField) }
         }
     }
 

@@ -1,3 +1,6 @@
+// GeminiLiveService — retained for potential future re-enablement.
+// As of v2.0, Deepgram is the sole transcription backend.
+// This class is NOT instantiated in the current session flow.
 import Foundation
 import Network
 

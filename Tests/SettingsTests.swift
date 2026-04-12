@@ -347,7 +347,8 @@ private func runTests() {
     suite("SettingsWindowController") {
         test("init does not crash") {
             cleanDefaults()
-            AppSettings.shared.geminiAPIKey = "smoke-test-key"
+            AppSettings.shared.deepgramAPIKey = "smoke-test-dg-key"  // v2.0: primary required key
+            AppSettings.shared.geminiAPIKey = "smoke-test-gemini-key"  // optional
             let wc = SettingsWindowController()
             expect(wc.window != nil, "window is created")
             wc.window?.close()
@@ -460,23 +461,21 @@ private func runTests() {
     // ── Backend selection ─────────────────────────────────────────────────────
 
     suite("TranscriptionCoordinator backend selection") {
-        test("deepgramKey empty + geminiKey set → uses GeminiLiveService") {
+        // v2.0: Deepgram is the sole transcription backend. No Gemini Live fallback.
+        test("deepgramKey empty → error state (Deepgram required)") {
             cleanDefaults()
             AppSettings.shared.deepgramAPIKey = ""
-            AppSettings.shared.geminiAPIKey   = "gemini-abc"
+            AppSettings.shared.geminiAPIKey   = "gemini-abc"  // Gemini key present but irrelevant for transcription
             let coordinator = TranscriptionCoordinator()
-            // startRecording selects backend; calling it with no audio permission
-            // is safe — it just fails to capture audio, but backend assignment happens.
+            var errorFired = false
+            coordinator.onError = { _ in errorFired = true }
             coordinator.startRecording()
-            // backend is private — we test observable side effects: state goes to
-            // .connecting (not .idle) only when a backend was selected and connect attempted.
-            // With no Deepgram key, it falls through to GeminiLiveService path.
-            // We can't inspect `backend` directly, so we verify the coordinator doesn't crash.
-            expect(true, "no crash when deepgramKey empty and geminiKey set")
-            coordinator.cancelRecording()
+            // v2.0: with no Deepgram key, startRecording() must set state to .error
+            // synchronously (before any async Task runs), so we can check immediately.
+            expect(errorFired, "onError fires when Deepgram key is missing")
             cleanDefaults()
         }
-        test("deepgramKey set → uses DeepgramService (no crash)") {
+        test("deepgramKey set → starts connecting (no crash)") {
             cleanDefaults()
             AppSettings.shared.deepgramAPIKey = "dg_xxx"
             AppSettings.shared.geminiAPIKey   = ""
@@ -486,18 +485,15 @@ private func runTests() {
             coordinator.cancelRecording()
             cleanDefaults()
         }
-        test("both keys empty → startRecording returns without crash, state stays idle") {
+        test("both keys empty → error state, no crash") {
             cleanDefaults()
             AppSettings.shared.deepgramAPIKey = ""
             AppSettings.shared.geminiAPIKey   = ""
             let coordinator = TranscriptionCoordinator()
-            var stateAtEnd = TranscriptionCoordinator.SessionState.recording // sentinel
-            coordinator.onStateChange = { state in stateAtEnd = state }
-            _ = stateAtEnd // suppress unused-variable warning
+            var errorFired = false
+            coordinator.onError = { _ in errorFired = true }
             coordinator.startRecording()
-            // With no keys, the coordinator should not crash and should stay idle
-            // (or briefly connect and fail — either way, no crash)
-            expect(true, "no crash when both keys empty")
+            expect(errorFired, "onError fires when no Deepgram key")
             cleanDefaults()
         }
     }

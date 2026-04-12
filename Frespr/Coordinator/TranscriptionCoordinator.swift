@@ -83,24 +83,6 @@ final class TranscriptionCoordinator {
     // MARK: - Setup
 
     private func setupBackendCallbacks() {
-        // onModelTurnComplete — Gemini-specific: re-open activity window after server closes turn
-        if let geminiBackend = backend as? GeminiLiveService {
-            geminiBackend.onModelTurnComplete = { [weak self] in
-                guard let self, self.state == .recording else { return }
-                // If a heartbeat bounce just sent activityEnd+activityStart, skip the
-                // redundant activityStart here — the bounce already reopened the activity.
-                if self.heartbeatBounceInFlight {
-                    dbg("onModelTurnComplete: skipping activityStart (heartbeat bounce in flight)")
-                    self.heartbeatBounceInFlight = false
-                    return
-                }
-                // Model finished its audio response — re-send activityStart so the server
-                // resumes transcribing the ongoing audio stream.
-                dbg("onModelTurnComplete: re-sending activityStart to resume transcription")
-                self.backend?.sendActivityStart()
-            }
-        }
-
         backend?.onSetupComplete = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self = self, self.state == .connecting else { return }
@@ -114,41 +96,9 @@ final class TranscriptionCoordinator {
                 }
 
                 self.state = .recording
-                // Tell the server we're starting a speech activity (VAD is disabled,
-                // so without this the server won't know we're speaking).
+                // Tell the backend we're starting a speech activity.
+                // Deepgram ignores this (no-op); kept for protocol conformance.
                 self.backend?.sendActivityStart()
-
-                // Heartbeat — Gemini-specific workaround for a server bug.
-                //
-                // WHY (plain): After receiving ~100 audio chunks (~10 seconds), Gemini
-                // silently stops sending transcription updates. You keep talking, audio
-                // keeps flowing, but nothing new appears in the overlay — it freezes.
-                //
-                // WHY (technical): The server's inputAudioTranscription pipeline stops
-                // emitting events after ~100 chunks within a single activity window.
-                // Root cause is unknown (confirmed Gemini Live bug, not our code).
-                //
-                // FIX: Every 8 seconds we send activityEnd + activityStart. This tells
-                // the server "this speech segment is done, starting a new one." The
-                // server flushes what it accumulated as a turnComplete, resets its
-                // internal state, and starts transcribing fresh.
-                //
-                // DOWNSIDE: After each bounce the server takes ~4 seconds to resume
-                // sending transcription words for the new segment. So every 8 seconds
-                // there's a ~4s gap in the overlay where nothing new appears even
-                // though the user is still speaking. This is Gemini server-side
-                // latency — there's no known way to avoid it while still working
-                // around the bug.
-                if self.backend is GeminiLiveService {
-                    self.transcriptHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
-                        Task { @MainActor [weak self] in
-                            guard let self, self.state == .recording else { return }
-                            dbg("heartbeat: sending activityEnd+activityStart to flush transcription segment")
-                            self.heartbeatBounceInFlight = true
-                            self.backend?.sendActivityBounce()
-                        }
-                    }
-                }
 
                 // Flush any audio buffered during the connection handshake.
                 if !self.connectBuffer.isEmpty {
@@ -237,19 +187,18 @@ final class TranscriptionCoordinator {
         guard state == .idle else { return }
 
         let deepgramKey = settings.deepgramAPIKey
-        let geminiKey = settings.geminiAPIKey
 
-        // Backend selection: Deepgram if key present, else Gemini (requires Gemini key)
-        if !deepgramKey.isEmpty {
-            backend = DeepgramService()
-        } else if !geminiKey.isEmpty {
-            backend = GeminiLiveService()
-        } else {
-            let msg = "No API key configured. Open Settings (⌘,) to add a Deepgram or Gemini key."
-            state = .error(msg)
+        // v2.0: Deepgram is the sole transcription backend. Gemini Live is no longer
+        // used for transcription — Gemini is optional for post-processing/translation only.
+        // Reset to .idle after showing the error so the next hotkey press re-triggers
+        // the warning rather than getting stuck in .error state permanently.
+        guard !deepgramKey.isEmpty else {
+            let msg = "Add a Deepgram API key in Settings to start transcribing."
             onError?(msg)
+            // Stay .idle so handleHotkeyPress can retry on the next press
             return
         }
+        backend = DeepgramService()
 
         setupBackendCallbacks()
 
@@ -277,7 +226,7 @@ final class TranscriptionCoordinator {
             self.state = .connecting
             self.startAudioCapture()
 
-            let apiKey = self.backend is DeepgramService ? deepgramKey : geminiKey
+            let apiKey = deepgramKey  // always Deepgram in v2.0
             do {
                 try await self.connectWithRetry(apiKey: apiKey)
             } catch {
@@ -657,7 +606,10 @@ final class TranscriptionCoordinator {
             // Cancel the in-flight processing so the user can start fresh.
             cancelRecording()
         case .error:
-            isToggled = false
+            // Reset to idle and retry — allows re-showing the warning on every press.
+            state = .idle
+            isToggled = true
+            startRecording()
         }
     }
 }
