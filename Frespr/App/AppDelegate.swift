@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBar = MenuBarController()
-    private let coordinator = GeminiSessionCoordinator()
+    private let coordinator = TranscriptionCoordinator()
     private let overlayViewModel = OverlayViewModel()
     private var overlayWindow: OverlayWindow?
     private var hotKeyMonitor: GlobalHotKeyMonitor?
@@ -31,7 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 4. Hotkey
         let monitor = GlobalHotKeyMonitor()
         monitor.option = AppSettings.shared.hotKeyOption
+        // Toggle mode: tap once to start, tap again to stop.
+        // key-down always starts (if idle) or stops (if recording/connecting).
+        // key-up is ignored — the user taps, not holds.
         monitor.onKeyDown = { Task { @MainActor [weak self] in self?.coordinator.handleHotkeyPress() } }
+        monitor.onKeyUp   = { }  // unused in toggle mode
         monitor.onPermissionNeeded = { Task { @MainActor [weak self] in self?.handleAccessibilityPermissionNeeded() } }
         monitor.start()
         hotKeyMonitor = monitor
@@ -69,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - State Handling
 
-    private func handleStateChange(_ state: GeminiSessionCoordinator.SessionState) {
+    private func handleStateChange(_ state: TranscriptionCoordinator.SessionState) {
         switch state {
         case .idle:
             menuBar.setIcon(.idle)

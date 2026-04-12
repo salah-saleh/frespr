@@ -2,14 +2,14 @@ import Foundation
 import AppKit
 
 @MainActor
-final class GeminiSessionCoordinator {
+final class TranscriptionCoordinator {
     // Callbacks for UI updates
     var onStateChange: ((SessionState) -> Void)?
     var onTranscriptUpdate: ((String, Bool) -> Void)?  // (text, isFinal)
     var onError: ((String) -> Void)?
 
     private let audioEngine = AudioCaptureEngine()
-    private let geminiService = GeminiLiveService()
+    private var backend: (any TranscriptionBackend)?
     private let settings = AppSettings.shared
 
     private(set) var state: SessionState = .idle {
@@ -18,18 +18,44 @@ final class GeminiSessionCoordinator {
 
     private var isToggled = false
     private var isDelivering = false  // guards against double-delivery
+    // Set when key-up fires while still .connecting (connection not yet complete).
+    // setupComplete checks this and stops immediately instead of starting to record.
+    private var pendingStop = false
     private var silenceChunkCount = 0
     private var transcriptHeartbeatTimer: Timer?
     private var heartbeatBounceInFlight = false  // suppresses redundant activityStart after bounce
-    private let silenceLevelThreshold: Float = 0.01
+
+    // Auto-calibrated silence threshold.
+    // Computed at session start by sampling the first N ambient chunks, then set to
+    // baseline * 2.5. Falls back to 0.006 if calibration produces an unreasonably
+    // low value (dead-silent room or bad mic). Never goes below the floor.
+    private var silenceLevelThreshold: Float = 0.006
+    private let silenceThresholdFloor: Float = 0.003
+    private let silenceCalibrationChunks = 5  // ~500ms at 10 chunks/sec
+    private var calibrationSamples: [Float] = []
+    private var isCalibrated = false
+
+    private var silenceDbgLogged = false  // throttle: log state/setting guard failure only once per recording
 
     // Accumulates all final transcript segments delivered by the server's VAD
     // while the user is still recording. Only injected when the user ends the session.
     private var accumulatedTranscript = ""
 
     // Audio chunks captured while still connecting (before setupComplete).
-    // Flushed to Gemini once the session is ready.
-    private var connectBuffer: [String] = []
+    // Flushed to the backend once the session is ready.
+    private var connectBuffer: [Data] = []
+
+    // MARK: - Internal Test Hooks
+
+    /// Exposes connectBuffer for regression testing only.
+    var testConnectBuffer: [Data] { connectBuffer }
+
+    /// Simulates an audio chunk arriving while in .connecting state (for regression testing).
+    func testInjectAudioChunk(_ data: Data) {
+        if state == .connecting {
+            connectBuffer.append(data)
+        }
+    }
 
     enum SessionState: Equatable {
         case idle
@@ -51,35 +77,48 @@ final class GeminiSessionCoordinator {
     }
 
     init() {
-        setupGeminiCallbacks()
+        // Backend is created lazily in startRecording() based on which API keys are set.
     }
 
     // MARK: - Setup
 
-    private func setupGeminiCallbacks() {
-        geminiService.onModelTurnComplete = { [weak self] in
-            guard let self, self.state == .recording else { return }
-            // If a heartbeat bounce just sent activityEnd+activityStart, skip the
-            // redundant activityStart here — the bounce already reopened the activity.
-            if self.heartbeatBounceInFlight {
-                dbg("onModelTurnComplete: skipping activityStart (heartbeat bounce in flight)")
-                self.heartbeatBounceInFlight = false
-                return
+    private func setupBackendCallbacks() {
+        // onModelTurnComplete — Gemini-specific: re-open activity window after server closes turn
+        if let geminiBackend = backend as? GeminiLiveService {
+            geminiBackend.onModelTurnComplete = { [weak self] in
+                guard let self, self.state == .recording else { return }
+                // If a heartbeat bounce just sent activityEnd+activityStart, skip the
+                // redundant activityStart here — the bounce already reopened the activity.
+                if self.heartbeatBounceInFlight {
+                    dbg("onModelTurnComplete: skipping activityStart (heartbeat bounce in flight)")
+                    self.heartbeatBounceInFlight = false
+                    return
+                }
+                // Model finished its audio response — re-send activityStart so the server
+                // resumes transcribing the ongoing audio stream.
+                dbg("onModelTurnComplete: re-sending activityStart to resume transcription")
+                self.backend?.sendActivityStart()
             }
-            // Model finished its audio response — re-send activityStart so the server
-            // resumes transcribing the ongoing audio stream.
-            dbg("onModelTurnComplete: re-sending activityStart to resume transcription")
-            self.geminiService.sendActivityStart()
         }
 
-        geminiService.onSetupComplete = { [weak self] in
+        backend?.onSetupComplete = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self = self, self.state == .connecting else { return }
+
+                // Key was released before connection completed — stop now instead of recording.
+                if self.pendingStop {
+                    dbg("setupComplete: pendingStop set — stopping immediately (key released during connect)")
+                    self.pendingStop = false
+                    self.cleanup()
+                    return
+                }
+
                 self.state = .recording
                 // Tell the server we're starting a speech activity (VAD is disabled,
                 // so without this the server won't know we're speaking).
-                self.geminiService.sendActivityStart()
-                // Heartbeat — workaround for a Gemini Live server bug.
+                self.backend?.sendActivityStart()
+
+                // Heartbeat — Gemini-specific workaround for a server bug.
                 //
                 // WHY (plain): After receiving ~100 audio chunks (~10 seconds), Gemini
                 // silently stops sending transcription updates. You keep talking, audio
@@ -100,19 +139,22 @@ final class GeminiSessionCoordinator {
                 // though the user is still speaking. This is Gemini server-side
                 // latency — there's no known way to avoid it while still working
                 // around the bug.
-                self.transcriptHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
-                    Task { @MainActor [weak self] in
-                        guard let self, self.state == .recording else { return }
-                        dbg("heartbeat: sending activityEnd+activityStart to flush transcription segment")
-                        self.heartbeatBounceInFlight = true
-                        self.geminiService.sendActivityBounce()
+                if self.backend is GeminiLiveService {
+                    self.transcriptHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
+                        Task { @MainActor [weak self] in
+                            guard let self, self.state == .recording else { return }
+                            dbg("heartbeat: sending activityEnd+activityStart to flush transcription segment")
+                            self.heartbeatBounceInFlight = true
+                            self.backend?.sendActivityBounce()
+                        }
                     }
                 }
+
                 // Flush any audio buffered during the connection handshake.
                 if !self.connectBuffer.isEmpty {
                     dbg("flushing \(self.connectBuffer.count) pre-connect audio chunks")
-                    for base64 in self.connectBuffer {
-                        self.geminiService.sendAudioChunk(base64: base64)
+                    for chunk in self.connectBuffer {
+                        self.backend?.sendAudioChunk(data: chunk)
                     }
                     self.connectBuffer.removeAll()
                 }
@@ -123,7 +165,7 @@ final class GeminiSessionCoordinator {
         // callback synchronously, so we must NOT wrap in Task { @MainActor }
         // — that would re-queue and cause a race where stopRecording() runs
         // before accumulatedTranscript is updated.
-        geminiService.onTranscriptUpdate = { [weak self] text, isFinal in
+        backend?.onTranscriptUpdate = { [weak self] text, isFinal in
             guard let self else { return }
             if isFinal {
                 // Normalize each segment individually before appending so that
@@ -154,9 +196,9 @@ final class GeminiSessionCoordinator {
             }
         }
 
-        geminiService.onError = { [weak self] error in
+        backend?.onError = { [weak self] error in
             Task { @MainActor [weak self] in
-                dbg("geminiService.onError: \(error.localizedDescription)")
+                dbg("backend.onError: \(error.localizedDescription)")
                 AudioFeedback.shared.playError()
                 self?.state = .error(error.localizedDescription)
                 self?.onError?(error.localizedDescription)
@@ -164,10 +206,10 @@ final class GeminiSessionCoordinator {
             }
         }
 
-        geminiService.onDisconnected = { [weak self] in
+        backend?.onDisconnected = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                dbg("geminiService.onDisconnected state=\(self.state)")
+                dbg("backend.onDisconnected state=\(self.state)")
                 if self.state != .idle {
                     // If we have accumulated text, deliver it before cleaning up.
                     if self.state == .processing && !self.accumulatedTranscript.isEmpty {
@@ -194,13 +236,22 @@ final class GeminiSessionCoordinator {
     func startRecording() {
         guard state == .idle else { return }
 
-        let apiKey = settings.geminiAPIKey
-        guard !apiKey.isEmpty else {
-            let msg = "Gemini API key not configured. Open Settings (⌘,) to add your key."
+        let deepgramKey = settings.deepgramAPIKey
+        let geminiKey = settings.geminiAPIKey
+
+        // Backend selection: Deepgram if key present, else Gemini (requires Gemini key)
+        if !deepgramKey.isEmpty {
+            backend = DeepgramService()
+        } else if !geminiKey.isEmpty {
+            backend = GeminiLiveService()
+        } else {
+            let msg = "No API key configured. Open Settings (⌘,) to add a Deepgram or Gemini key."
             state = .error(msg)
             onError?(msg)
             return
         }
+
+        setupBackendCallbacks()
 
         Task { @MainActor in
             // If mic permission hasn't been granted yet, request it now and wait.
@@ -216,7 +267,8 @@ final class GeminiSessionCoordinator {
                 try? await Task.sleep(nanoseconds: 300_000_000)
             }
 
-            guard self.state == .idle else { return }  // user may have pressed again
+            // Abort if state changed OR user double-tapped (isToggled cleared by handleHotkeyPress)
+            guard self.state == .idle, self.isToggled else { return }
 
             self.accumulatedTranscript = ""
             self.connectBuffer.removeAll()
@@ -225,6 +277,7 @@ final class GeminiSessionCoordinator {
             self.state = .connecting
             self.startAudioCapture()
 
+            let apiKey = self.backend is DeepgramService ? deepgramKey : geminiKey
             do {
                 try await self.connectWithRetry(apiKey: apiKey)
             } catch {
@@ -238,6 +291,14 @@ final class GeminiSessionCoordinator {
     /// Called when hotkey is released (hold mode) or second press (toggle mode)
     func stopRecording() {
         guard state == .recording || state == .connecting else { return }
+        // If still connecting, defer the stop until setupComplete fires.
+        // This handles the case where the user releases the key before the
+        // WebSocket handshake completes (e.g. quick tap ~150-300ms).
+        if state == .connecting {
+            dbg("stopRecording: still connecting — deferring stop via pendingStop")
+            pendingStop = true
+            return
+        }
         AudioFeedback.shared.playStop()
         state = .processing
         audioEngine.stop()
@@ -245,7 +306,7 @@ final class GeminiSessionCoordinator {
         // Grab whatever partial transcript the current VAD turn has accumulated
         // in the service layer — this is the text from the final in-flight segment
         // that may never get a turnComplete (server can take seconds to respond).
-        geminiService.sendStreamEnd()
+        backend?.sendStreamEnd()
 
         // Wait for the server to return turnComplete for the final segment.
         //
@@ -266,13 +327,15 @@ final class GeminiSessionCoordinator {
         //   - No wasted wait time when the server is fast (common case: ~1-2s).
         //   - 4s hard cap catches the rare case where turnComplete never arrives
         //     (connection drop, server bug) — snap currentTurnTranscript partial.
-        Task {
+        // BUG FIX: was plain Task {} (background thread) — calling @MainActor methods
+        // (deliverTranscript, cleanup) from a non-isolated context is undefined in Swift 6.
+        Task { @MainActor in
             for _ in 0..<40 {
                 try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms
                 guard self.state == .processing else { return }  // turnComplete already delivered
             }
             // 4s elapsed and no turnComplete — snap whatever partial we have
-            let partial = self.normalizeTranscription(self.geminiService.currentTurnTranscript)
+            let partial = self.normalizeTranscription(self.backend?.currentPartialTranscript ?? "")
             if !partial.isEmpty {
                 dbg("stopRecording: snapping partial turn after 4s: '\(partial.prefix(80))'")
                 if !self.accumulatedTranscript.isEmpty { self.accumulatedTranscript += " " }
@@ -285,13 +348,17 @@ final class GeminiSessionCoordinator {
 
     // MARK: - Private
 
-    /// Connects to Gemini with up to 3 attempts and exponential backoff.
+    /// Connects to the backend with up to 3 attempts and exponential backoff.
+    /// Does not retry on DeepgramError.unauthorized (invalid key — retrying won't help).
     private func connectWithRetry(apiKey: String, maxAttempts: Int = 3) async throws {
         var lastError: Error?
         for attempt in 1...maxAttempts {
             do {
-                try await geminiService.connect(apiKey: apiKey)
+                try await backend!.connect(apiKey: apiKey)
                 return
+            } catch DeepgramError.unauthorized {
+                // Invalid key — no point retrying
+                throw DeepgramError.unauthorized
             } catch {
                 lastError = error
                 guard attempt < maxAttempts, state == .connecting else { break }
@@ -300,38 +367,76 @@ final class GeminiSessionCoordinator {
                 try? await Task.sleep(nanoseconds: UInt64(backoffMs) * 1_000_000)
             }
         }
-        throw lastError ?? GeminiLiveError.connectionFailed("Max retries exceeded")
+        throw lastError ?? TranscriptionError.connectionFailed("Max retries exceeded")
     }
 
     private func startAudioCapture() {
         silenceChunkCount = 0
+        silenceDbgLogged = false  // reset one-shot diagnostic flag each recording
+        calibrationSamples = []
+        isCalibrated = false
 
         audioEngine.onAudioChunk = { [weak self] data in
-            let base64 = data.base64EncodedString()
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if self.state == .connecting {
                     // Not yet connected — buffer for later flush.
-                    self.connectBuffer.append(base64)
+                    self.connectBuffer.append(data)
                 } else {
-                    self.geminiService.sendAudioChunk(base64: base64)
+                    self.backend?.sendAudioChunk(data: data)
                 }
             }
         }
 
         audioEngine.onAudioLevel = { [weak self] rms in
-            guard let self, self.state == .recording else { return }
-            guard AppSettings.shared.silenceDetectionEnabled else { return }
-            if rms < self.silenceLevelThreshold {
-                self.silenceChunkCount += 1
-                let timeoutChunks = AppSettings.shared.silenceTimeoutSeconds * 10
-                if self.silenceChunkCount >= timeoutChunks {
-                    Task { @MainActor [weak self] in
-                        self?.stopRecording()
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+
+                // --- Ambient calibration phase (runs during .connecting) ---
+                // We sample ambient noise while the WebSocket handshake is in progress
+                // (before the user is expected to speak). This gives a clean baseline
+                // uncontaminated by speech. By the time state → .recording the threshold
+                // is already set and we go straight into active detection.
+                if self.state == .connecting && !self.isCalibrated {
+                    self.calibrationSamples.append(rms)
+                    if self.calibrationSamples.count >= self.silenceCalibrationChunks {
+                        let baseline = self.calibrationSamples.reduce(0, +) / Float(self.calibrationSamples.count)
+                        let calibrated = max(baseline * 2.5, self.silenceThresholdFloor)
+                        self.silenceLevelThreshold = calibrated
+                        self.isCalibrated = true
+                        dbg("[silence-calibrate] baseline=\(String(format: "%.4f", baseline)) threshold=\(String(format: "%.4f", calibrated))")
                     }
+                    return
                 }
-            } else {
-                self.silenceChunkCount = 0
+
+                guard self.state == .recording else { return }
+                guard AppSettings.shared.silenceDetectionEnabled else { return }
+
+                // If connection was so fast that calibration didn't finish, fall back
+                // to the hardcoded floor so we don't fire on every chunk.
+                if !self.isCalibrated {
+                    self.silenceLevelThreshold = self.silenceThresholdFloor
+                    self.isCalibrated = true
+                    dbg("[silence-calibrate] fast-connect fallback threshold=\(String(format: "%.4f", self.silenceThresholdFloor))")
+                }
+
+                // --- Active silence detection ---
+                let timeoutSecs = AppSettings.shared.silenceTimeoutSeconds > 0
+                    ? AppSettings.shared.silenceTimeoutSeconds : 5
+                let timeoutChunks = timeoutSecs * 10
+                if rms < self.silenceLevelThreshold {
+                    self.silenceChunkCount += 1
+                    dbg("[silence] chunk \(self.silenceChunkCount)/\(timeoutChunks) rms=\(String(format: "%.4f", rms)) threshold=\(String(format: "%.4f", self.silenceLevelThreshold))")
+                    if self.silenceChunkCount >= timeoutChunks {
+                        dbg("[silence] timeout reached — auto-stopping")
+                        self.stopRecording()
+                    }
+                } else {
+                    if self.silenceChunkCount > 0 {
+                        dbg("[silence] reset (was \(self.silenceChunkCount)) rms=\(String(format: "%.4f", rms))")
+                    }
+                    self.silenceChunkCount = 0
+                }
             }
         }
 
@@ -355,6 +460,28 @@ final class GeminiSessionCoordinator {
 
         guard !rawText.isEmpty else {
             cleanup()
+            return
+        }
+
+        // T039: if post-processing is requested but no Gemini key is set, warn and inject raw.
+        let postMode = settings.postProcessingMode
+        if postMode != .none && settings.geminiAPIKey.isEmpty {
+            dbg("deliverTranscript: post-processing requires Gemini key — injecting raw")
+            onTranscriptUpdate?("Post-processing requires a Gemini API key.", false)
+            Task { @MainActor in
+                TranscriptionLog.shared.add(text: rawText)
+                self.onTranscriptUpdate?(rawText, true)
+                if self.settings.copyToClipboard {
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    pb.setString(rawText, forType: .string)
+                }
+                AudioFeedback.shared.playSuccess()
+                self.cleanup()
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                dbg("injecting (no postprocess key): '\(rawText.prefix(80))'")
+                TextInjector.shared.inject(text: rawText)
+            }
             return
         }
 
@@ -488,26 +615,41 @@ final class GeminiSessionCoordinator {
     }
 
     private func cleanup() {
+        dbg("cleanup: state was \(state) — resetting to idle")
         transcriptHeartbeatTimer?.invalidate()
         transcriptHeartbeatTimer = nil
         heartbeatBounceInFlight = false
         audioEngine.stop()
-        geminiService.disconnect()
+        backend?.disconnect()
+        backend = nil
         state = .idle
         isToggled = false
         isDelivering = false
+        pendingStop = false
         silenceChunkCount = 0
+        silenceDbgLogged = false
+        calibrationSamples = []
+        isCalibrated = false
         connectBuffer.removeAll()
     }
 
     // MARK: - Hotkey
 
     func handleHotkeyPress() {
-        dbg("handleHotkeyPress state=\(state)")
+        dbg("handleHotkeyPress state=\(state) isToggled=\(isToggled)")
         switch state {
         case .idle:
-            isToggled = true
-            startRecording()
+            if isToggled {
+                // Second tap arrived while still in async startup (state hasn't moved
+                // to .connecting yet) — cancel the in-flight start.
+                dbg("handleHotkeyPress: double-tap during async startup — cancelling")
+                isToggled = false
+                // startRecording() guards on state == .idle so it will abort itself.
+                // Nothing else to do here.
+            } else {
+                isToggled = true
+                startRecording()
+            }
         case .recording, .connecting:
             isToggled = false
             stopRecording()
@@ -515,7 +657,7 @@ final class GeminiSessionCoordinator {
             // Cancel the in-flight processing so the user can start fresh.
             cancelRecording()
         case .error:
-            break
+            isToggled = false
         }
     }
 }

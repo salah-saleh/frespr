@@ -29,6 +29,8 @@ compile() {
     "$SRC/Gemini/GeminiProtocol.swift" \
     "$SRC/Gemini/GeminiLiveService.swift" \
     "$SRC/Gemini/GeminiPostProcessor.swift" \
+    "$SRC/Coordinator/TranscriptionBackend.swift" \
+    "$SRC/Deepgram/DeepgramService.swift" \
     "$SRC/Audio/AudioCaptureEngine.swift" \
     "$SRC/Audio/AudioFeedback.swift" \
     "$SRC/TextInjection/TextInjector.swift" \
@@ -40,7 +42,7 @@ compile() {
     "$SRC/UI/OverlayWindow.swift" \
     "$SRC/UI/SettingsView.swift" \
     "$SRC/UI/SettingsWindowController.swift" \
-    "$SRC/Coordinator/GeminiSessionCoordinator.swift" \
+    "$SRC/Coordinator/TranscriptionCoordinator.swift" \
     "$SRC/App/AppDelegate.swift" \
     "$SRC/App/main.swift" \
     -o "$BUILD/Frespr"

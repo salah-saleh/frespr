@@ -8,6 +8,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let apiKeyStatus   = NSImageView()
     private let apiKeyEditBtn  = NSButton()
     private var apiKeyIsEditing = false
+    private let dgKeyField     = NSTextField()
+    private let dgKeyStatus    = NSImageView()
+    private let dgKeyEditBtn   = NSButton()
+    private var dgKeyIsEditing  = false
+    private let dgBackendLabel: NSTextField = {
+        let tf = NSTextField(labelWithString: "")
+        tf.font = .systemFont(ofSize: 11)
+        tf.textColor = .secondaryLabelColor
+        return tf
+    }()
     private let silenceCheck     = NSButton(checkboxWithTitle: "Auto-stop after silence", target: nil, action: nil)
     private let silenceTimeout   = NSTextField()
     private let silenceTimeoutStepper = NSStepper()
@@ -136,6 +146,46 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                          .font: NSFont.systemFont(ofSize: 11),
                          .underlineStyle: NSUnderlineStyle.single.rawValue])
         stack.addArrangedSubview(row(linkBtn))
+
+        stack.addArrangedSubview(divider())
+
+        // ── Deepgram API Key ─────────────────────────────────────────
+        stack.addArrangedSubview(row(sectionHeader("Deepgram API Key (optional — fast mode)"), top: p))
+
+        dgKeyField.placeholderString = "Paste your Deepgram API key here"
+        dgKeyField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        dgKeyField.bezelStyle = .roundedBezel
+        dgKeyField.cell?.usesSingleLineMode = true
+        dgKeyField.cell?.isScrollable = true
+        dgKeyField.target = self
+        dgKeyField.action = #selector(dgKeySavePressed)
+
+        dgKeyStatus.translatesAutoresizingMaskIntoConstraints = false
+        dgKeyStatus.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        dgKeyStatus.heightAnchor.constraint(equalToConstant: 18).isActive = true
+
+        dgKeyEditBtn.bezelStyle = .rounded
+        dgKeyEditBtn.controlSize = .small
+        dgKeyEditBtn.target = self
+        dgKeyEditBtn.action = #selector(dgKeyEditPressed)
+
+        let dgKeyRow = NSStackView(views: [dgKeyField, dgKeyStatus, dgKeyEditBtn])
+        dgKeyRow.orientation = .horizontal
+        dgKeyRow.spacing = 8
+        dgKeyRow.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(row(dgKeyRow))
+
+        stack.addArrangedSubview(row(dgBackendLabel))
+
+        let dgLinkBtn = NSButton(title: "", target: self, action: #selector(openDeepgramConsole))
+        dgLinkBtn.bezelStyle = .inline
+        dgLinkBtn.isBordered = false
+        dgLinkBtn.attributedTitle = NSAttributedString(
+            string: "Get a free key at Deepgram →",
+            attributes: [.foregroundColor: NSColor.linkColor,
+                         .font: NSFont.systemFont(ofSize: 11),
+                         .underlineStyle: NSUnderlineStyle.single.rawValue])
+        stack.addArrangedSubview(row(dgLinkBtn))
 
         stack.addArrangedSubview(divider())
 
@@ -384,6 +434,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if translationTargetPopup.indexOfSelectedItem < 0 { translationTargetPopup.selectItem(withTitle: "English") }
         updateTranslationRowsEnabled()
         loadFavorites()
+        // Deepgram section
+        let dgKey = s.deepgramAPIKey
+        updateDGKeyStatus(key: dgKey)
+        setDGKeyEditing(dgKey.isEmpty)
+        updateDGBackendLabel()
     }
 
     private func updateSilenceRowEnabled() {
@@ -480,6 +535,50 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    private func updateDGKeyStatus(key: String) {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        if key.isEmpty {
+            dgKeyStatus.image = NSImage(systemSymbolName: "circle.dashed",
+                                        accessibilityDescription: "no key")?.withSymbolConfiguration(cfg)
+            dgKeyStatus.contentTintColor = .tertiaryLabelColor
+        } else {
+            dgKeyStatus.image = NSImage(systemSymbolName: "checkmark.circle.fill",
+                                        accessibilityDescription: "key set")?.withSymbolConfiguration(cfg)
+            dgKeyStatus.contentTintColor = .systemGreen
+        }
+    }
+
+    private func setDGKeyEditing(_ editing: Bool) {
+        dgKeyIsEditing = editing
+        dgKeyField.isEditable = editing
+        dgKeyField.isSelectable = editing
+        dgKeyField.backgroundColor = editing ? .textBackgroundColor : .controlBackgroundColor
+
+        if editing {
+            dgKeyField.stringValue = AppSettings.shared.deepgramAPIKey
+            dgKeyEditBtn.title = "Save"
+        } else {
+            let key = AppSettings.shared.deepgramAPIKey
+            dgKeyField.stringValue = key.isEmpty ? "" : mask(key)
+            dgKeyEditBtn.title = "Edit"
+        }
+    }
+
+    private func updateDGBackendLabel() {
+        let s = AppSettings.shared
+        let hasDG     = !s.deepgramAPIKey.isEmpty
+        let hasGemini = !s.geminiAPIKey.isEmpty
+        if hasDG {
+            dgBackendLabel.stringValue = "Transcribing with Deepgram (fast mode)"
+            dgBackendLabel.isHidden = false
+        } else if hasGemini {
+            dgBackendLabel.stringValue = "Transcribing with Gemini Live"
+            dgBackendLabel.isHidden = false
+        } else {
+            dgBackendLabel.isHidden = true
+        }
+    }
+
     private func mask(_ key: String) -> String {
         guard key.count > 8 else { return String(repeating: "•", count: key.count) }
         let suffix = String(key.suffix(4))
@@ -509,6 +608,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             AppSettings.shared.geminiAPIKey = key
             updateAPIKeyStatus(key: key)
             setAPIKeyEditing(false)
+            updateDGBackendLabel()
             window?.makeFirstResponder(nil)
         } else {
             // Enter edit mode
@@ -520,6 +620,31 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func apiKeySavePressed() {
         // Return key in field triggers save
         if apiKeyIsEditing { apiKeyEditPressed() }
+    }
+
+    @objc private func dgKeyEditPressed() {
+        if dgKeyIsEditing {
+            // Save
+            let key = dgKeyField.stringValue
+            AppSettings.shared.deepgramAPIKey = key
+            updateDGKeyStatus(key: key)
+            setDGKeyEditing(false)
+            updateDGBackendLabel()
+            window?.makeFirstResponder(nil)
+        } else {
+            // Enter edit mode
+            setDGKeyEditing(true)
+            window?.makeFirstResponder(dgKeyField)
+        }
+    }
+
+    @objc private func dgKeySavePressed() {
+        // Return key in field triggers save
+        if dgKeyIsEditing { dgKeyEditPressed() }
+    }
+
+    @objc private func openDeepgramConsole() {
+        NSWorkspace.shared.open(URL(string: "https://console.deepgram.com/signup")!)
     }
 
     @objc private func silenceCheckChanged() {
@@ -647,6 +772,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if apiKeyIsEditing {
             let key = apiKeyField.stringValue
             AppSettings.shared.geminiAPIKey = key
+        }
+        if dgKeyIsEditing {
+            AppSettings.shared.deepgramAPIKey = dgKeyField.stringValue
         }
         AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
         NSApp.mainMenu = nil

@@ -9,8 +9,19 @@ final class AppSettings {
     private let defaults = UserDefaults.standard
 
     var geminiAPIKey: String {
-        get { KeychainHelper.read() ?? "" }
-        set { KeychainHelper.write(newValue) }
+        get { KeychainHelper.read(account: "geminiAPIKey") ?? "" }
+        set { KeychainHelper.write(newValue, account: "geminiAPIKey") }
+    }
+
+    var deepgramAPIKey: String {
+        get { KeychainHelper.read(account: "deepgramAPIKey") ?? "" }
+        set {
+            if newValue.isEmpty {
+                KeychainHelper.delete(account: "deepgramAPIKey")
+            } else {
+                KeychainHelper.write(newValue, account: "deepgramAPIKey")
+            }
+        }
     }
 
     var postProcessingMode: PostProcessingMode {
@@ -125,7 +136,7 @@ final class AppSettings {
         ])
         // Migrate legacy API key from UserDefaults → Keychain (one-time)
         if let legacy = defaults.string(forKey: Keys.geminiAPIKey), !legacy.isEmpty {
-            KeychainHelper.write(legacy)
+            KeychainHelper.write(legacy, account: "geminiAPIKey")
             defaults.removeObject(forKey: Keys.geminiAPIKey)
         }
     }
@@ -185,11 +196,10 @@ let kSupportedLanguages: [String] = [
 
 // MARK: - KeychainHelper
 
-private enum KeychainHelper {
+enum KeychainHelper {
     private static let service = "com.frespr.app"
-    private static let account = "geminiAPIKey"
 
-    static func read() -> String? {
+    static func read(account: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass:            kSecClassGenericPassword,
             kSecAttrService:      service,
@@ -205,9 +215,9 @@ private enum KeychainHelper {
         return str
     }
 
-    static func write(_ value: String) {
+    static func write(_ value: String, account: String) {
         guard let data = value.data(using: .utf8) else { return }
-        if read() != nil {
+        if read(account: account) != nil {
             let query: [CFString: Any] = [
                 kSecClass:       kSecClassGenericPassword,
                 kSecAttrService: service,
@@ -226,7 +236,7 @@ private enum KeychainHelper {
         }
     }
 
-    static func delete() {
+    static func delete(account: String) {
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
             kSecAttrService: service,
