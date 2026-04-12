@@ -159,12 +159,17 @@ final class TranscriptionCoordinator {
         backend?.onDisconnected = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                dbg("backend.onDisconnected state=\(self.state)")
+                dbg("backend.onDisconnected state=\(self.state) isDelivering=\(self.isDelivering)")
                 if self.state != .idle {
-                    // If we have accumulated text, deliver it before cleaning up.
-                    if self.state == .processing && !self.accumulatedTranscript.isEmpty {
+                    if self.isDelivering {
+                        // deliverTranscript() is already in flight (post-processing async).
+                        // Do nothing — it will call cleanup() when it finishes.
+                        dbg("backend.onDisconnected: delivery in flight, skipping cleanup")
+                    } else if self.state == .processing && !self.accumulatedTranscript.isEmpty {
+                        // Transcript arrived before disconnect — deliver it now.
                         self.deliverTranscript()
                     } else {
+                        // No transcript and nothing in flight — clean up.
                         self.cleanup()
                     }
                 }

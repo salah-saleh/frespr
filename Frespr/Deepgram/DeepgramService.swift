@@ -119,8 +119,20 @@ final class DeepgramService: NSObject, TranscriptionBackend {
                     // Re-arm
                     self.startReceiveLoop()
                 case .failure(let error):
-                    dbg("[Deepgram] receive error: \(error)")
-                    self.onError?(error)
+                    // A normal close (e.g. after CloseStream or disconnect()) arrives as
+                    // NSPOSIXErrorDomain code 57 "Socket is not connected" or a cancelled
+                    // error. These are expected and should NOT be reported as errors —
+                    // just signal disconnection so the coordinator can deliver the transcript.
+                    let nsError = error as NSError
+                    let isNormalClose = nsError.domain == NSPOSIXErrorDomain
+                        || nsError.code == NSURLErrorCancelled
+                        || nsError.domain == "NSURLErrorDomain"
+                    if isNormalClose {
+                        dbg("[Deepgram] receive loop closed (normal) — signalling disconnect")
+                    } else {
+                        dbg("[Deepgram] receive error: \(error)")
+                        self.onError?(error)
+                    }
                     self.onDisconnected?()
                 }
             }
@@ -166,9 +178,20 @@ final class DeepgramService: NSObject, TranscriptionBackend {
     // MARK: - sendStreamEnd
 
     func sendStreamEnd() {
-        // Deepgram: close the WebSocket to signal end-of-stream
-        dbg("[Deepgram] sendStreamEnd — closing WebSocket")
-        webSocketTask?.sendPing { _ in }
+        // Deepgram streaming protocol: send {"type":"CloseStream"} JSON message to signal
+        // end-of-audio. Deepgram will flush any buffered audio, emit a final transcript,
+        // then close the WebSocket from its side. The receive loop's .failure case will
+        // then fire onDisconnected → deliverTranscript() without waiting for the 4s timeout.
+        //
+        // NOTE: Do NOT call webSocketTask?.cancel() here — that would abort before Deepgram
+        // returns the final transcript. Let Deepgram close the connection gracefully.
+        dbg("[Deepgram] sendStreamEnd — sending CloseStream signal")
+        let closeMsg = "{\"type\":\"CloseStream\"}"
+        webSocketTask?.send(.string(closeMsg)) { error in
+            if let error {
+                dbg("[Deepgram] sendStreamEnd error: \(error)")
+            }
+        }
     }
 
     // MARK: - Activity markers (no-op for Deepgram)
