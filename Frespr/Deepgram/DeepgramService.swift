@@ -67,7 +67,10 @@ final class DeepgramService: NSObject, TranscriptionBackend {
             URLQueryItem(name: "encoding", value: "linear16"),
             URLQueryItem(name: "sample_rate", value: "16000"),
             URLQueryItem(name: "interim_results", value: "true"),
-            URLQueryItem(name: "punctuate", value: "true")
+            URLQueryItem(name: "punctuate", value: "true"),
+            // multi: detects and transcribes mixed-language speech within a single stream.
+            // Restores the multilingual capability that Gemini Live provided natively.
+            URLQueryItem(name: "language", value: "multi"),
         ]
         guard let url = components.url else {
             throw DeepgramError.connectionFailed("Failed to build Deepgram URL")

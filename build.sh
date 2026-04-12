@@ -81,10 +81,15 @@ if [ "$MODE" = "run" ]; then
   pkill -x Frespr 2>/dev/null || true
   sleep 0.3
 
-  # NOTE: tccutil reset Accessibility intentionally removed from dev builds.
-  # It triggered a keychain password prompt on every build. Ad-hoc re-signing
-  # does technically invalidate the TCC grant, but macOS re-prompts automatically
-  # if the hotkey stops working — no need to force-reset every build.
+  # Reset Accessibility TCC entry so macOS re-prompts after re-sign.
+  # Ad-hoc signing generates a new signature hash every build, invalidating
+  # the previous grant. Without this reset the app shows a stale red X in
+  # Settings and the hotkey silently fails.
+  #
+  # To avoid the sudo password prompt on every build, run this once:
+  #   echo "sam ALL=(ALL) NOPASSWD: /usr/bin/tccutil reset Accessibility com.frespr.app" | sudo tee /etc/sudoers.d/frespr-tccutil
+  # This grants passwordless sudo for this one command only.
+  sudo tccutil reset Accessibility com.frespr.app 2>/dev/null || true
 
   # Clear the debug log so next tail -f starts fresh
   > /tmp/frespr_debug.log
