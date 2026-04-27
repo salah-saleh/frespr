@@ -474,38 +474,42 @@ final class TranscriptionCoordinator {
         let mode = settings.postProcessingMode
         guard mode != .none else { return rawText }
 
-        let systemPrompt: String
-        let userMessagePrefix: String
-        switch mode {
-        case .none:
-            return rawText
-        case .cleanup, .summarize:
-            guard let prompt = mode.systemPrompt else { return rawText }
-            systemPrompt = prompt
-            userMessagePrefix = "Reformat"
-        case .custom:
-            let custom = settings.customPostProcessingPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !custom.isEmpty else { return rawText }
-            systemPrompt = custom
-            // Neutral verb so the custom system prompt is the sole directive
-            userMessagePrefix = "Process"
-        }
-
         let apiKey = settings.geminiAPIKey
         guard !apiKey.isEmpty else { return rawText }
 
+        // For custom mode: pass the instruction inline in the user message so Gemini
+        // treats it as a direct command (not background context). For built-in modes,
+        // use systemInstruction as normal.
         do {
             dbg("postProcess mode=\(mode.rawValue)")
-            let result = try await GeminiPostProcessor.process(
-                rawText: rawText,
-                systemPrompt: systemPrompt,
-                apiKey: apiKey,
-                userMessagePrefix: userMessagePrefix
-            )
+            let result: String
+            switch mode {
+            case .none:
+                return rawText
+            case .cleanup, .summarize:
+                guard let prompt = mode.systemPrompt else { return rawText }
+                result = try await GeminiPostProcessor.process(
+                    rawText: rawText,
+                    systemPrompt: prompt,
+                    apiKey: apiKey,
+                    userMessagePrefix: "Reformat"
+                )
+            case .custom:
+                let custom = settings.customPostProcessingPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !custom.isEmpty else { return rawText }
+                // inlineInstruction puts the custom prompt in the user turn, making it
+                // unambiguously the directive rather than background system context.
+                result = try await GeminiPostProcessor.process(
+                    rawText: rawText,
+                    systemPrompt: "Follow instructions.",
+                    apiKey: apiKey,
+                    inlineInstruction: custom
+                )
+            }
             dbg("postProcess done: '\(result.prefix(80))'")
             return result
         } catch {
-            dbg("postProcess error (using raw): \(error.localizedDescription)")
+            dbg("postProcess error (using raw): \(error)")
             return rawText
         }
     }

@@ -39,28 +39,45 @@ private struct GenerateResponse: Decodable {
 @MainActor
 final class GeminiPostProcessor {
 
+    // gemini-2.5-flash: replaces deprecated gemini-2.0-flash (shutdown June 1 2026).
     private static let endpoint =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     /// Apply `systemPrompt` to `rawText` and return the model's response.
     /// Throws on network error, non-200 response, or empty result.
     /// Callers should catch and fall back to `rawText`.
     ///
-    /// `userMessagePrefix` lets callers control the instruction verb so custom
-    /// prompts aren't overridden by the hardcoded "Reformat" framing.
+    /// `userMessagePrefix` — verb prefixed to "this transcript:" in the user turn (e.g. "Reformat").
+    ///
+    /// `inlineInstruction` — when set (custom prompt mode), the instruction is placed directly
+    /// in the user message rather than as a system instruction. This ensures Gemini treats it
+    /// as a direct command, not background context. systemPrompt is ignored when this is set.
     static func process(
         rawText: String,
         systemPrompt: String,
         apiKey: String,
-        userMessagePrefix: String = "Process"
+        userMessagePrefix: String = "Process",
+        inlineInstruction: String? = nil
     ) async throws -> String {
         guard let url = URL(string: endpoint) else {
             throw URLError(.badURL)
         }
 
-        let userMessage = "\(userMessagePrefix) this transcript:\n<transcript>\n\(rawText)\n</transcript>"
+        // For custom instructions: embed the instruction directly in the user message so the
+        // model treats it as a direct command rather than background system context.
+        // For built-in modes (cleanup/summarize): use systemInstruction as normal.
+        let userMessage: String
+        let sysInstruction: String
+        if let inline = inlineInstruction {
+            userMessage = "\(inline)\n\nHere is the transcript:\n<transcript>\n\(rawText)\n</transcript>\n\nOutput only the result, no commentary."
+            sysInstruction = "You are a helpful assistant. Follow the user's instruction exactly."
+        } else {
+            userMessage = "\(userMessagePrefix) this transcript:\n<transcript>\n\(rawText)\n</transcript>"
+            sysInstruction = systemPrompt
+        }
+
         let body = GenerateRequest(
-            systemInstruction: .init(parts: [.init(text: systemPrompt)]),
+            systemInstruction: .init(parts: [.init(text: sysInstruction)]),
             contents: [.init(parts: [.init(text: userMessage)], role: "user")],
             generationConfig: .init(temperature: 0.0, candidateCount: 1)
         )
@@ -75,7 +92,7 @@ final class GeminiPostProcessor {
 
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             let msg = String(data: data, encoding: .utf8) ?? "<no body>"
-            dbg("GeminiPostProcessor HTTP \(http.statusCode): \(msg.prefix(200))")
+            dbg("GeminiPostProcessor HTTP \(http.statusCode): \(msg.prefix(400))")
             throw URLError(.badServerResponse)
         }
 

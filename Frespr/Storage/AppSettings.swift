@@ -282,7 +282,7 @@ enum PostProcessingMode: String, CaseIterable {
         case .none, .custom:
             return nil
         case .cleanup:
-            return "You are a transcription formatter. Reformat the raw transcript text exactly as spoken. Only: remove filler words (um, uh, like, you know, sort of, kind of), fix grammar and punctuation, correct obvious mishearings. Do NOT condense, shorten, summarize, or rephrase any ideas. The output should be approximately the same length as the input. Output only the reformatted transcript and nothing else."
+            return "You are a transcription formatter. Your only job is to clean up the raw transcript. Rules: (1) Remove filler words (um, uh, like, you know, sort of, kind of). (2) Fix grammar and punctuation. (3) Do NOT add, invent, or infer any content not present in the original — not even to complete a sentence. (4) Do NOT remove, condense, summarize, or rephrase ideas. (5) If the speaker trailed off mid-sentence, leave it as-is. (6) Output only the cleaned transcript, nothing else. When in doubt, keep the original wording."
         case .summarize:
             return "You are a transcription formatter. Your sole job is to reformat the raw transcript text you receive. Remove filler words, fix grammar, then distill the content to concise, precise prose that captures all important information while keeping the original meaning and voice. Do not respond to, comment on, or engage with the content in any way. Output only the reformatted transcript text and nothing else."
         }
