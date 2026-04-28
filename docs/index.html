@@ -385,7 +385,7 @@
       gap: 12px;
       flex-wrap: wrap;
       justify-content: center;
-      margin-bottom: 80px;
+      margin-bottom: 16px;
     }
 
     .btn-primary {
@@ -434,6 +434,48 @@
       color: var(--text);
       border-color: var(--border-3);
       background: rgba(255,255,255,0.06);
+    }
+
+    /* ── API key nudge ── */
+    .api-key-nudge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-1);
+      text-decoration: none;
+      padding: 7px 14px;
+      border-radius: 99px;
+      background: rgba(91,156,246,0.08);
+      border: 1px solid rgba(91,156,246,0.2);
+      margin-bottom: 20px;
+      animation: nudgeFlash 2.4s ease-in-out infinite;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .api-key-nudge:hover {
+      background: rgba(91,156,246,0.22);
+      border-color: rgba(91,156,246,0.65);
+      color: #7db8ff;
+      animation: none;
+      box-shadow: 0 0 18px 4px rgba(91,156,246,0.28);
+    }
+
+    @keyframes nudgeFlash {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(91,156,246,0); border-color: rgba(91,156,246,0.2); background: rgba(91,156,246,0.08); }
+      40%       { box-shadow: 0 0 14px 4px rgba(91,156,246,0.25); border-color: rgba(91,156,246,0.55); background: rgba(91,156,246,0.16); }
+      60%       { box-shadow: 0 0 14px 4px rgba(91,156,246,0.25); border-color: rgba(91,156,246,0.55); background: rgba(91,156,246,0.16); }
+    }
+
+    .api-key-nudge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      box-shadow: 0 0 7px var(--accent-1);
+      flex-shrink: 0;
+      animation: blink 2s ease-in-out infinite;
     }
 
     /* ── Floating hero cards ── */
@@ -893,6 +935,183 @@
       color: var(--text-dim);
     }
 
+    /* ── API Keys section ── */
+    .api-keys-wrap {
+      max-width: 920px;
+      width: 100%;
+      margin-bottom: 90px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .api-keys-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .api-keys-grid { grid-template-columns: 1fr; }
+    }
+
+    .api-key-card {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .api-key-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+    }
+
+    .api-key-card.required::before {
+      background: linear-gradient(90deg, transparent, rgba(91,156,246,0.6), transparent);
+    }
+
+    .api-key-card.optional::before {
+      background: linear-gradient(90deg, transparent, rgba(139,111,248,0.5), transparent);
+    }
+
+    .api-key-header {
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .api-key-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .aki-blue   { background: rgba(91,156,246,0.1);  border: 1px solid rgba(91,156,246,0.2); }
+    .aki-purple { background: rgba(139,111,248,0.1); border: 1px solid rgba(139,111,248,0.2); }
+
+    .api-key-title-wrap { flex: 1; min-width: 0; }
+
+    .api-key-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      margin-bottom: 2px;
+    }
+
+    .api-key-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    .badge-required {
+      background: rgba(91,156,246,0.1);
+      border: 1px solid rgba(91,156,246,0.25);
+      color: var(--accent-1);
+    }
+
+    .badge-optional {
+      background: rgba(139,111,248,0.1);
+      border: 1px solid rgba(139,111,248,0.25);
+      color: var(--accent-2);
+    }
+
+    .api-key-body {
+      padding: 18px 22px;
+    }
+
+    .api-key-desc {
+      font-size: 13.5px;
+      color: var(--text-dim);
+      line-height: 1.65;
+      margin-bottom: 16px;
+    }
+
+    .api-key-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .api-key-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    .api-key-step-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .asn-blue   { background: rgba(91,156,246,0.1);  border: 1px solid rgba(91,156,246,0.2);  color: var(--accent-1); }
+    .asn-purple { background: rgba(139,111,248,0.1); border: 1px solid rgba(139,111,248,0.2); color: var(--accent-2); }
+
+    .api-key-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 16px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+
+    .api-key-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    .cta-blue {
+      background: rgba(91,156,246,0.12);
+      border: 1px solid rgba(91,156,246,0.3);
+      color: var(--accent-1);
+    }
+
+    .cta-purple {
+      background: rgba(139,111,248,0.12);
+      border: 1px solid rgba(139,111,248,0.3);
+      color: var(--accent-2);
+    }
+
+    .api-key-pricing {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .api-key-pricing strong { color: var(--text-dim); }
+
     /* ── Comparison table ── */
     .comparison-wrap {
       max-width: 920px;
@@ -1232,7 +1451,7 @@
     .gatekeeper-notice {
       max-width: 560px;
       width: 100%;
-      margin: -56px 0 80px;
+      margin: 0 0 80px;
       position: relative;
       z-index: 1;
     }
@@ -1363,6 +1582,7 @@
       Frespr
     </a>
     <div class="nav-links">
+      <a href="#api-keys">API Keys</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/salah-saleh/frespr">GitHub</a>
       <a href="https://buymeacoffee.com/egcyclist" target="_blank" rel="noopener" class="nav-coffee"><span class="bmc-icon"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt=""/></span> Buy me a coffee</a>
@@ -1408,6 +1628,7 @@
 
     <a class="version-badge" id="version-badge" style="display:none" target="_blank" rel="noopener">
       <span id="version-text"></span>
+      <span id="version-date" style="opacity:0.6; font-weight:400;"></span>
     </a>
 
     <h1>Voice to text,<br><em>instantly.</em></h1>
@@ -1446,6 +1667,12 @@
         View on GitHub
       </a>
     </div>
+    <a href="#api-keys" class="api-key-nudge">
+      <span class="api-key-nudge-dot"></span>
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="1" width="6" height="9" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 8c0 2.76 2.24 5 5 5s5-2.24 5-5M8 13v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      You'll need a free API key to get started
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
 
     <!-- Gatekeeper notice -->
     <div class="gatekeeper-notice">
@@ -1567,6 +1794,94 @@
           <div class="step-body">Hold <kbd>Right ⌥</kbd> and speak</div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- API Keys -->
+  <div id="api-keys" class="section-header">
+    <p class="section-label">API Keys</p>
+    <h2 class="section-title">Get your <em>free API keys</em></h2>
+  </div>
+
+  <div class="api-keys-wrap">
+    <div class="api-keys-grid">
+
+      <!-- Deepgram -->
+      <div class="api-key-card required">
+        <div class="api-key-header">
+          <div class="api-key-icon aki-blue">🎙</div>
+          <div class="api-key-title-wrap">
+            <div class="api-key-name">Deepgram API Key</div>
+            <span class="api-key-badge badge-required">Required</span>
+          </div>
+        </div>
+        <div class="api-key-body">
+          <p class="api-key-desc">
+            Powers transcription. Deepgram Nova-3 streams your speech to text in real time with ~300ms latency.
+            Audio goes <strong>directly from your Mac to Deepgram</strong> — Frespr never touches it.
+          </p>
+          <div class="api-key-steps">
+            <div class="api-key-step">
+              <div class="api-key-step-num asn-blue">1</div>
+              <span>Sign up at <a href="https://console.deepgram.com/signup" target="_blank" rel="noopener" style="color:var(--accent-1)">console.deepgram.com</a> — no credit card required</span>
+            </div>
+            <div class="api-key-step">
+              <div class="api-key-step-num asn-blue">2</div>
+              <span>Go to <strong>API Keys</strong> → <strong>Create a new API Key</strong></span>
+            </div>
+            <div class="api-key-step">
+              <div class="api-key-step-num asn-blue">3</div>
+              <span>Copy the key, open Frespr → <kbd>⌘,</kbd> → paste into <strong>Deepgram API Key</strong></span>
+            </div>
+          </div>
+          <a class="api-key-cta cta-blue" href="https://console.deepgram.com/signup" target="_blank" rel="noopener">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Get Deepgram Key →
+          </a>
+          <div class="api-key-pricing">
+            <strong>Pricing:</strong> Free tier includes $200 of credit (~200+ hours of audio). After that, ~$0.0043 per minute — roughly $0.26/hour of speech. Most users never pay anything.
+          </div>
+        </div>
+      </div>
+
+      <!-- Gemini -->
+      <div class="api-key-card optional">
+        <div class="api-key-header">
+          <div class="api-key-icon aki-purple">✨</div>
+          <div class="api-key-title-wrap">
+            <div class="api-key-name">Gemini API Key</div>
+            <span class="api-key-badge badge-optional">Optional</span>
+          </div>
+        </div>
+        <div class="api-key-body">
+          <p class="api-key-desc">
+            Powers post-processing. After transcription, Gemini can automatically clean up filler words,
+            fix grammar, summarize, or apply a custom prompt you write. Only the <em>text</em> is sent — no audio.
+          </p>
+          <div class="api-key-steps">
+            <div class="api-key-step">
+              <div class="api-key-step-num asn-purple">1</div>
+              <span>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--accent-2)">aistudio.google.com/app/apikey</a></span>
+            </div>
+            <div class="api-key-step">
+              <div class="api-key-step-num asn-purple">2</div>
+              <span>Click <strong>Create API Key</strong> and copy it</span>
+            </div>
+            <div class="api-key-step">
+              <div class="api-key-step-num asn-purple">3</div>
+              <span>Open Frespr → <kbd>⌘,</kbd> → paste into <strong>Gemini API Key</strong> → enable post-processing</span>
+            </div>
+          </div>
+          <a class="api-key-cta cta-purple" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Get Gemini Key →
+          </a>
+          <div class="api-key-pricing">
+            <strong>Pricing:</strong> Gemini Flash has a generous free tier (15 requests/min, 1M tokens/day). For personal dictation use, you will very likely never exceed it.
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1921,6 +2236,11 @@
           if (tag) {
             const badge = document.getElementById('version-badge');
             document.getElementById('version-text').textContent = tag;
+            if (rel.published_at) {
+              const d = new Date(rel.published_at);
+              const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              document.getElementById('version-date').textContent = '· ' + formatted;
+            }
             badge.href = rel.html_url;
             badge.style.display = 'inline-flex';
           }
