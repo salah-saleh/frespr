@@ -119,6 +119,7 @@ Log is cleared on every `bash build.sh` run.
 swiftc -target arm64-apple-macosx14.0 -sdk $(xcrun --show-sdk-path --sdk macosx) \
   Frespr/App/Debug.swift \
   Frespr/Audio/AudioCaptureEngine.swift \
+  Frespr/Audio/AudioFeedback.swift \
   Frespr/Coordinator/TranscriptionBackend.swift \
   Frespr/Coordinator/TranscriptionCoordinator.swift \
   Frespr/Deepgram/DeepgramService.swift \

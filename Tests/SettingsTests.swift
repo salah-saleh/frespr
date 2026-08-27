@@ -4,6 +4,7 @@
 //   swiftc -target arm64-apple-macosx14.0 -sdk $(xcrun --show-sdk-path --sdk macosx) \
 //     Frespr/App/Debug.swift \
 //     Frespr/Audio/AudioCaptureEngine.swift \
+//     Frespr/Audio/AudioFeedback.swift \
 //     Frespr/Coordinator/TranscriptionBackend.swift \
 //     Frespr/Coordinator/TranscriptionCoordinator.swift \
 //     Frespr/Deepgram/DeepgramService.swift \
@@ -75,7 +76,7 @@ private func expectEqual<T: Equatable>(_ a: T, _ b: T, _ msg: String,
 
 private let settingsKeys = [
     "postProcessingMode", "customPostProcessingPrompt",
-    "copyToClipboard", "silenceDetectionEnabled", "silenceTimeoutSeconds",
+    "copyToClipboard",
     "hotKeyOption", "translationEnabled", "translationSourceLanguage", "translationTargetLanguage"
 ]
 
@@ -86,16 +87,18 @@ private func cleanDefaults() {
     cleanKeychain()
 }
 
+/// Resets key storage between tests.
+///
+/// Deliberately does NOT touch the real Keychain. Previously this called
+/// SecItemDelete directly, which made macOS prompt for Keychain authorization —
+/// once per test, because this runs in cleanDefaults() before every test. A test
+/// binary is signed with a different identity than the shipped app, so it has no
+/// standing grant and the dialog cannot be dismissed for the whole run. Swapping
+/// in a fresh InMemorySecretStore gives each test clean key state with no
+/// prompts, and leaves the developer's real keys untouched.
 @MainActor
 private func cleanKeychain() {
-    for account in ["geminiAPIKey", "deepgramAPIKey"] {
-        let query: [CFString: Any] = [
-            kSecClass:       kSecClassGenericPassword,
-            kSecAttrService: "com.frespr.app",
-            kSecAttrAccount: account
-        ]
-        SecItemDelete(query as CFDictionary)
-    }
+    SecretStorage.current = InMemorySecretStore()
 }
 
 // MARK: - Tests
@@ -162,42 +165,6 @@ private func runTests() {
             cleanDefaults()
             AppSettings.shared.copyToClipboard = false
             expect(!AppSettings.shared.copyToClipboard, "persists false")
-        }
-    }
-
-    suite("AppSettings.silenceDetectionEnabled") {
-        test("registered default is true") {
-            cleanDefaults()
-            expect(AppSettings.shared.silenceDetectionEnabled, "registered default is true")
-        }
-        test("read/write false") {
-            cleanDefaults()
-            AppSettings.shared.silenceDetectionEnabled = false
-            expect(!AppSettings.shared.silenceDetectionEnabled, "persists false")
-        }
-        test("read/write true") {
-            cleanDefaults()
-            AppSettings.shared.silenceDetectionEnabled = true
-            expect(AppSettings.shared.silenceDetectionEnabled, "persists true")
-        }
-    }
-
-    suite("AppSettings.silenceTimeoutSeconds") {
-        test("registered default is 10") {
-            cleanDefaults()
-            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 10, "registered default is 10")
-        }
-        test("read/write arbitrary value") {
-            cleanDefaults()
-            AppSettings.shared.silenceTimeoutSeconds = 30
-            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 30, "persists 30")
-        }
-        test("read/write boundary values") {
-            cleanDefaults()
-            AppSettings.shared.silenceTimeoutSeconds = 5
-            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 5, "persists 5")
-            AppSettings.shared.silenceTimeoutSeconds = 60
-            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 60, "persists 60")
         }
     }
 
@@ -355,20 +322,6 @@ private func runTests() {
             cleanDefaults()
         }
 
-        test("action round-trip: silenceDetectionEnabled") {
-            cleanDefaults()
-            AppSettings.shared.silenceDetectionEnabled = false
-            let wc = SettingsWindowController()
-            // loadValues() ran during init and set silenceCheck.state = .off
-            // Now toggle the check via its action (simulate user clicking the checkbox)
-            // We can't set the private control, but we can verify the action reads from it.
-            // Instead: verify the current AppSettings value is what we set.
-            expectEqual(AppSettings.shared.silenceDetectionEnabled, false,
-                        "AppSettings retains value set before init")
-            wc.window?.close()
-            cleanDefaults()
-        }
-
         test("action round-trip: hotKeyOption via perform") {
             cleanDefaults()
             AppSettings.shared.hotKeyOption = .leftOption
@@ -378,19 +331,6 @@ private func runTests() {
             wc.perform(NSSelectorFromString("hotKeyChanged"))
             expectEqual(AppSettings.shared.hotKeyOption, .leftOption,
                         "hotKeyChanged writes loadValues-selected value back (round-trip)")
-            wc.window?.close()
-            cleanDefaults()
-        }
-
-        test("action round-trip: silenceTimeout via stepper perform") {
-            cleanDefaults()
-            AppSettings.shared.silenceTimeoutSeconds = 20
-            let wc = SettingsWindowController()
-            // loadValues() set silenceTimeout field and stepper to 20
-            // Performing silenceTimeoutChanged reads from the text field
-            wc.perform(NSSelectorFromString("silenceTimeoutChanged"))
-            expectEqual(AppSettings.shared.silenceTimeoutSeconds, 20,
-                        "silenceTimeoutChanged writes loadValues-set value back (round-trip)")
             wc.window?.close()
             cleanDefaults()
         }
@@ -438,23 +378,20 @@ private func runTests() {
             cleanDefaults()
             expectEqual(AppSettings.shared.deepgramAPIKey, "", "defaults to empty")
         }
-        test("delete-on-empty: keychain entry absent after set-empty") {
+        test("delete-on-empty: stored entry absent after set-empty") {
             cleanDefaults()
             // Write a real value first so there is something to delete
             AppSettings.shared.deepgramAPIKey = "dg_to_delete"
-            // Now clear it — the setter should delete the keychain item
+            // Now clear it — the setter should delete the stored item, not store ""
             AppSettings.shared.deepgramAPIKey = ""
-            // Read directly from Keychain — must be nil (item deleted)
-            let readQuery: [CFString: Any] = [
-                kSecClass:            kSecClassGenericPassword,
-                kSecAttrService:      "com.frespr.app",
-                kSecAttrAccount:      "deepgramAPIKey",
-                kSecReturnData:       true,
-                kSecMatchLimit:       kSecMatchLimitOne
-            ]
-            var result: AnyObject?
-            let status = SecItemCopyMatching(readQuery as CFDictionary, &result)
-            expect(status == errSecItemNotFound, "keychain item absent after set-empty (status=\(status))")
+            // Assert against the injected store rather than reading the Keychain
+            // directly. The old version issued its own SecItemCopyMatching, which
+            // (a) prompted for Keychain access and (b) once tests stopped writing
+            // to the real Keychain, found the developer's actual key and failed.
+            // Querying SecretStorage verifies the delete-vs-store-empty behaviour
+            // this test actually cares about.
+            expect(SecretStorage.current.read(account: "deepgramAPIKey") == nil,
+                   "stored item absent after set-empty (delete, not empty-string write)")
         }
     }
 

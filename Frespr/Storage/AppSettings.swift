@@ -9,17 +9,17 @@ final class AppSettings {
     private let defaults = UserDefaults.standard
 
     var geminiAPIKey: String {
-        get { KeychainHelper.read(account: "geminiAPIKey") ?? "" }
-        set { KeychainHelper.write(newValue, account: "geminiAPIKey") }
+        get { SecretStorage.current.read(account: "geminiAPIKey") ?? "" }
+        set { SecretStorage.current.write(newValue, account: "geminiAPIKey") }
     }
 
     var deepgramAPIKey: String {
-        get { KeychainHelper.read(account: "deepgramAPIKey") ?? "" }
+        get { SecretStorage.current.read(account: "deepgramAPIKey") ?? "" }
         set {
             if newValue.isEmpty {
-                KeychainHelper.delete(account: "deepgramAPIKey")
+                SecretStorage.current.delete(account: "deepgramAPIKey")
             } else {
-                KeychainHelper.write(newValue, account: "deepgramAPIKey")
+                SecretStorage.current.write(newValue, account: "deepgramAPIKey")
             }
         }
     }
@@ -40,16 +40,6 @@ final class AppSettings {
     var copyToClipboard: Bool {
         get { defaults.bool(forKey: Keys.copyToClipboard) }
         set { defaults.set(newValue, forKey: Keys.copyToClipboard) }
-    }
-
-    var silenceDetectionEnabled: Bool {
-        get { defaults.bool(forKey: Keys.silenceDetectionEnabled) }
-        set { defaults.set(newValue, forKey: Keys.silenceDetectionEnabled) }
-    }
-
-    var silenceTimeoutSeconds: Int {
-        get { defaults.integer(forKey: Keys.silenceTimeoutSeconds) }
-        set { defaults.set(newValue, forKey: Keys.silenceTimeoutSeconds) }
     }
 
     var hotKeyOption: HotKeyOption {
@@ -125,8 +115,6 @@ final class AppSettings {
     private init() {
         defaults.register(defaults: [
             Keys.copyToClipboard: false,
-            Keys.silenceDetectionEnabled: true,
-            Keys.silenceTimeoutSeconds: 10,
             Keys.hotKeyOption: HotKeyOption.rightOption.rawValue,
             Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue,
             Keys.soundFeedbackEnabled: true,
@@ -146,8 +134,6 @@ final class AppSettings {
         static let postProcessingMode        = "postProcessingMode"
         static let customPostProcessingPrompt = "customPostProcessingPrompt"
         static let copyToClipboard           = "copyToClipboard"
-        static let silenceDetectionEnabled   = "silenceDetectionEnabled"
-        static let silenceTimeoutSeconds     = "silenceTimeoutSeconds"
         static let hotKeyOption              = "hotKeyOption"
         static let translationEnabled        = "translationEnabled"
         static let translationSourceLanguage = "translationSourceLanguage"
@@ -193,6 +179,46 @@ let kSupportedLanguages: [String] = [
     "Yiddish", "Yoruba",
     "Zulu"
 ]
+
+// MARK: - Secret storage
+
+/// Abstracts where API keys are persisted so tests can substitute an
+/// in-memory store instead of hitting the real Keychain.
+///
+/// Why this exists: any binary that links AppSettings and reads a key
+/// property triggers a macOS Keychain authorization prompt, because a test
+/// binary is signed with a different identity than the shipped app. The test
+/// suite resets settings before every test, so that produced one prompt per
+/// test — dozens of dialogs, and no way to complete a run. Injecting the
+/// store keeps the production path byte-for-byte identical while letting
+/// tests opt out of the Keychain entirely.
+protocol SecretStore {
+    func read(account: String) -> String?
+    func write(_ value: String, account: String)
+    func delete(account: String)
+}
+
+/// Process-wide seam for secret storage. Production leaves this as the
+/// Keychain-backed default; `SettingsTests` swaps in `InMemorySecretStore`
+/// before touching any key property.
+enum SecretStorage {
+    static var current: SecretStore = KeychainSecretStore()
+}
+
+/// Non-persistent SecretStore for tests. Never touches the Keychain.
+final class InMemorySecretStore: SecretStore {
+    private var storage: [String: String] = [:]
+    func read(account: String) -> String? { storage[account] }
+    func write(_ value: String, account: String) { storage[account] = value }
+    func delete(account: String) { storage.removeValue(forKey: account) }
+}
+
+/// Keychain-backed SecretStore — the production implementation.
+struct KeychainSecretStore: SecretStore {
+    func read(account: String) -> String? { KeychainHelper.read(account: account) }
+    func write(_ value: String, account: String) { KeychainHelper.write(value, account: account) }
+    func delete(account: String) { KeychainHelper.delete(account: account) }
+}
 
 // MARK: - KeychainHelper
 

@@ -71,7 +71,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let apiKeyStatus   = NSImageView()
     private let apiKeyEditBtn  = NSButton()
     private var apiKeyIsEditing = false
-    private var silenceMouseMonitor: Any?  // local mouse-down monitor to commit timeout field on outside click
     private let dgKeyField     = NSTextField()
     private let dgKeyStatus    = NSImageView()
     private let dgKeyEditBtn   = NSButton()
@@ -83,11 +82,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         return tf
     }()
 
-    // Silence detection
-    private let silenceCheck     = NSButton(checkboxWithTitle: "Auto-stop after silence", target: nil, action: nil)
-    private let silenceTimeout   = NSTextField()
-    private let silenceTimeoutStepper = NSStepper()
-    private let silenceTimeoutLabel   = NSTextField(labelWithString: "seconds")
 
     // Post-processing
     private let ppNoneRadio      = NSButton(radioButtonWithTitle: PostProcessingMode.none.displayName,      target: nil, action: nil)
@@ -272,7 +266,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         root.addArrangedSubview(gemContainer)
         pinWidth(gemContainer)
 
-        // ── Hotkey + Silence card ──────────────────────────────────────
+        // ── Hotkey card ────────────────────────────────────────────────
         let inputCard = makeCard()
         let inputInner = cardStack(in: inputCard)
 
@@ -298,29 +292,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         inputInner.addArrangedSubview(cardSeparator())
 
-        // Silence detection row
-        silenceCheck.target = self; silenceCheck.action = #selector(silenceCheckChanged)
-        inputInner.addArrangedSubview(silenceCheck)
-
-        silenceTimeout.bezelStyle = .roundedBezel
-        silenceTimeout.alignment  = .center
-        silenceTimeout.font       = .systemFont(ofSize: 13)
-        silenceTimeout.widthAnchor.constraint(equalToConstant: 48).isActive = true
-        silenceTimeout.target     = self
-        silenceTimeout.action     = #selector(silenceTimeoutChanged)
-        silenceTimeout.delegate   = self
-
-        silenceTimeoutStepper.minValue    = 5
-        silenceTimeoutStepper.maxValue    = 60
-        silenceTimeoutStepper.increment   = 1
-        silenceTimeoutStepper.valueWraps  = false
-        silenceTimeoutStepper.target = self; silenceTimeoutStepper.action = #selector(silenceStepperChanged(_:))
-
-        let silenceLabel = makeRowLabel("Stop after")
-        let silenceRow = NSStackView(views: [silenceLabel, silenceTimeout, silenceTimeoutStepper, silenceTimeoutLabel])
-        silenceRow.orientation = .horizontal
-        silenceRow.spacing = 6
-        inputInner.addArrangedSubview(silenceRow)
 
         let inputContainer = padded(inputCard, top: 0, bottom: 0)
         root.addArrangedSubview(inputContainer)
@@ -635,11 +606,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         setDGKeyEditing(dgKey.isEmpty)
         updateDGBackendLabel()
 
-        // Silence
-        silenceCheck.state = s.silenceDetectionEnabled ? .on : .off
-        silenceTimeout.integerValue = s.silenceTimeoutSeconds
-        silenceTimeoutStepper.integerValue = s.silenceTimeoutSeconds
-        updateSilenceRowEnabled()
 
         // Post-processing
         updatePPRadios(mode: s.postProcessingMode)
@@ -663,13 +629,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if translationTargetPopup.indexOfSelectedItem < 0 { translationTargetPopup.selectItem(withTitle: "English") }
         updateTranslationRowsEnabled()
         loadFavorites()
-    }
-
-    private func updateSilenceRowEnabled() {
-        let on = AppSettings.shared.silenceDetectionEnabled
-        silenceTimeout.isEnabled        = on
-        silenceTimeoutStepper.isEnabled = on
-        silenceTimeoutLabel.textColor   = on ? .labelColor : .disabledControlTextColor
     }
 
     private func updatePPRadios(mode: PostProcessingMode) {
@@ -861,52 +820,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
     }
 
-    @objc private func silenceCheckChanged() {
-        AppSettings.shared.silenceDetectionEnabled = silenceCheck.state == .on
-        updateSilenceRowEnabled()
-    }
+    // MARK: - NSTextFieldDelegate (custom prompt field)
 
-    @objc private func silenceTimeoutChanged() {
-        let v = max(5, min(60, silenceTimeout.integerValue))
-        silenceTimeout.integerValue        = v
-        silenceTimeoutStepper.integerValue = v
-        AppSettings.shared.silenceTimeoutSeconds = v
-    }
-
-    @objc private func silenceStepperChanged(_ sender: NSStepper) {
-        silenceTimeout.integerValue = sender.integerValue
-        AppSettings.shared.silenceTimeoutSeconds = sender.integerValue
-    }
-
-    // MARK: - NSTextFieldDelegate (silence timeout + custom prompt fields)
-
-    // Strip non-digit characters live as the user types, and sync the stepper
-    // immediately so arrows always operate on the current typed value.
-    // Also saves the custom prompt on every keystroke so it's available immediately.
+    // Saves the custom prompt on every keystroke so it's available immediately.
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === ppCustomField {
             AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
-            return
         }
-        guard (obj.object as? NSTextField) === silenceTimeout else { return }
-        // Remove any non-digit characters in place
-        let digits = silenceTimeout.stringValue.filter { $0.isNumber }
-        if digits != silenceTimeout.stringValue {
-            silenceTimeout.stringValue = digits
-        }
-        // Sync stepper to the current raw value (no clamping yet — allow partial input)
-        if let v = Int(digits) {
-            silenceTimeoutStepper.integerValue = max(5, min(60, v))
-        }
-    }
-
-    // Clamp and save when Return is pressed (already wired via .action → silenceTimeoutChanged).
-    // Also called by controlTextDidEndEditing below.
-
-    // Save when the field loses focus for any reason (click elsewhere, tab, window close).
-    func controlTextDidEndEditing(_ obj: Notification) {
-        guard (obj.object as? NSTextField) === silenceTimeout else { return }
-        silenceTimeoutChanged()
     }
 
     @objc private func ppModeChanged(_ sender: NSButton) {
@@ -992,22 +912,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             if self.dgKeyIsEditing      { w.makeFirstResponder(self.dgKeyField) }
             else if self.apiKeyIsEditing { w.makeFirstResponder(self.apiKeyField) }
         }
-
-        // When the user clicks anywhere in the window while the silence timeout field
-        // is first responder, force it to commit before the click is processed.
-        // This ensures typing a value then clicking a checkbox registers the new value.
-        silenceMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            guard let self else { return event }
-            guard let w = self.window, let fr = w.firstResponder else { return event }
-            // fieldEditor is an NSTextView subclass; its delegate is the actual NSTextField
-            let fieldEditor = fr as? NSTextView
-            let activeField = fieldEditor?.delegate as? NSTextField ?? fr as? NSTextField
-            if activeField === self.silenceTimeout {
-                self.silenceTimeoutChanged()
-                w.makeFirstResponder(nil)
-            }
-            return event
-        }
     }
 
     private func installEditMenu() {
@@ -1041,10 +945,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             AppSettings.shared.deepgramAPIKey = dgKeyField.stringValue
         }
         AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
-        if let monitor = silenceMouseMonitor {
-            NSEvent.removeMonitor(monitor)
-            silenceMouseMonitor = nil
-        }
         NSApp.mainMenu = nil
         NSApp.setActivationPolicy(.accessory)
         onClose?()

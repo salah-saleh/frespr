@@ -96,7 +96,7 @@ final class AudioCaptureEngine {
                 self.accumulator.removeFirst(bytesPerChunk)
                 let chunkData = Data(chunk)
                 self.onAudioChunk?(chunkData)
-                // Compute RMS for silence detection
+                // Compute RMS for any registered level observer (no-op when unset)
                 if self.onAudioLevel != nil {
                     let samples = chunkData.withUnsafeBytes { ptr -> [Int16] in
                         let buf = ptr.bindMemory(to: Int16.self)

@@ -9,8 +9,6 @@ struct SettingsView: View {
     // that break paste. Syncs to AppSettings on change.
     @State private var apiKey: String = AppSettings.shared.geminiAPIKey
     @State private var apiKeyVisible = false
-    @State private var silenceEnabled: Bool = AppSettings.shared.silenceDetectionEnabled
-    @State private var silenceTimeout: Int = AppSettings.shared.silenceTimeoutSeconds
     @State private var translationEnabled: Bool = AppSettings.shared.translationEnabled
     @State private var translationSource: String = AppSettings.shared.translationSourceLanguage
     @State private var translationTarget: String = AppSettings.shared.translationTargetLanguage
@@ -49,30 +47,6 @@ struct SettingsView: View {
                     Text("Required to use Frespr.")
                         .foregroundStyle(.red)
                 }
-            }
-
-            // Silence Detection
-            Section {
-                Toggle("Auto-stop after silence", isOn: $silenceEnabled)
-                    .onChange(of: silenceEnabled) { _, new in
-                        AppSettings.shared.silenceDetectionEnabled = new
-                    }
-
-                HStack {
-                    Text("Stop after")
-                    Stepper(value: $silenceTimeout, in: 5...60) {
-                        Text("\(silenceTimeout) seconds")
-                    }
-                    .onChange(of: silenceTimeout) { _, new in
-                        AppSettings.shared.silenceTimeoutSeconds = new
-                    }
-                    .disabled(!silenceEnabled)
-                }
-            } header: {
-                Text("Silence Detection")
-            } footer: {
-                Text("Automatically stop recording when no speech is detected.")
-                    .foregroundStyle(.secondary)
             }
 
             // Translation
@@ -150,8 +124,6 @@ struct SettingsView: View {
         .task {
             // Re-sync local state in case Settings was opened before with different values
             apiKey = AppSettings.shared.geminiAPIKey
-            silenceEnabled = AppSettings.shared.silenceDetectionEnabled
-            silenceTimeout = AppSettings.shared.silenceTimeoutSeconds
             translationEnabled = AppSettings.shared.translationEnabled
             translationSource = AppSettings.shared.translationSourceLanguage
             translationTarget = AppSettings.shared.translationTargetLanguage

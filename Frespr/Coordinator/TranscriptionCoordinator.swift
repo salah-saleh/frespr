@@ -21,21 +21,8 @@ final class TranscriptionCoordinator {
     // Set when key-up fires while still .connecting (connection not yet complete).
     // setupComplete checks this and stops immediately instead of starting to record.
     private var pendingStop = false
-    private var silenceChunkCount = 0
     private var transcriptHeartbeatTimer: Timer?
     private var heartbeatBounceInFlight = false  // suppresses redundant activityStart after bounce
-
-    // Auto-calibrated silence threshold.
-    // Computed at session start by sampling the first N ambient chunks, then set to
-    // baseline * 2.5. Falls back to 0.006 if calibration produces an unreasonably
-    // low value (dead-silent room or bad mic). Never goes below the floor.
-    private var silenceLevelThreshold: Float = 0.006
-    private let silenceThresholdFloor: Float = 0.003
-    private let silenceCalibrationChunks = 5  // ~500ms at 10 chunks/sec
-    private var calibrationSamples: [Float] = []
-    private var isCalibrated = false
-
-    private var silenceDbgLogged = false  // throttle: log state/setting guard failure only once per recording
 
     // Accumulates all final transcript segments delivered by the server's VAD
     // while the user is still recording. Only injected when the user ends the session.
@@ -325,10 +312,6 @@ final class TranscriptionCoordinator {
     }
 
     private func startAudioCapture() {
-        silenceChunkCount = 0
-        silenceDbgLogged = false  // reset one-shot diagnostic flag each recording
-        calibrationSamples = []
-        isCalibrated = false
 
         audioEngine.onAudioChunk = { [weak self] data in
             Task { @MainActor [weak self] in
@@ -342,57 +325,6 @@ final class TranscriptionCoordinator {
             }
         }
 
-        audioEngine.onAudioLevel = { [weak self] rms in
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-
-                // --- Ambient calibration phase (runs during .connecting) ---
-                // We sample ambient noise while the WebSocket handshake is in progress
-                // (before the user is expected to speak). This gives a clean baseline
-                // uncontaminated by speech. By the time state → .recording the threshold
-                // is already set and we go straight into active detection.
-                if self.state == .connecting && !self.isCalibrated {
-                    self.calibrationSamples.append(rms)
-                    if self.calibrationSamples.count >= self.silenceCalibrationChunks {
-                        let baseline = self.calibrationSamples.reduce(0, +) / Float(self.calibrationSamples.count)
-                        let calibrated = max(baseline * 2.5, self.silenceThresholdFloor)
-                        self.silenceLevelThreshold = calibrated
-                        self.isCalibrated = true
-                        dbg("[silence-calibrate] baseline=\(String(format: "%.4f", baseline)) threshold=\(String(format: "%.4f", calibrated))")
-                    }
-                    return
-                }
-
-                guard self.state == .recording else { return }
-                guard AppSettings.shared.silenceDetectionEnabled else { return }
-
-                // If connection was so fast that calibration didn't finish, fall back
-                // to the hardcoded floor so we don't fire on every chunk.
-                if !self.isCalibrated {
-                    self.silenceLevelThreshold = self.silenceThresholdFloor
-                    self.isCalibrated = true
-                    dbg("[silence-calibrate] fast-connect fallback threshold=\(String(format: "%.4f", self.silenceThresholdFloor))")
-                }
-
-                // --- Active silence detection ---
-                let timeoutSecs = AppSettings.shared.silenceTimeoutSeconds > 0
-                    ? AppSettings.shared.silenceTimeoutSeconds : 5
-                let timeoutChunks = timeoutSecs * 10
-                if rms < self.silenceLevelThreshold {
-                    self.silenceChunkCount += 1
-                    dbg("[silence] chunk \(self.silenceChunkCount)/\(timeoutChunks) rms=\(String(format: "%.4f", rms)) threshold=\(String(format: "%.4f", self.silenceLevelThreshold))")
-                    if self.silenceChunkCount >= timeoutChunks {
-                        dbg("[silence] timeout reached — auto-stopping")
-                        self.stopRecording()
-                    }
-                } else {
-                    if self.silenceChunkCount > 0 {
-                        dbg("[silence] reset (was \(self.silenceChunkCount)) rms=\(String(format: "%.4f", rms))")
-                    }
-                    self.silenceChunkCount = 0
-                }
-            }
-        }
 
         do {
             try audioEngine.start()
@@ -591,10 +523,6 @@ final class TranscriptionCoordinator {
         isToggled = false
         isDelivering = false
         pendingStop = false
-        silenceChunkCount = 0
-        silenceDbgLogged = false
-        calibrationSamples = []
-        isCalibrated = false
         connectBuffer.removeAll()
     }
 
