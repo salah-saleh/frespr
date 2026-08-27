@@ -7,6 +7,9 @@ final class TranscriptionCoordinator {
     var onStateChange: ((SessionState) -> Void)?
     var onTranscriptUpdate: ((String, Bool) -> Void)?  // (text, isFinal)
     var onError: ((String) -> Void)?
+    /// Fired after injection with whether the AX path confirmed the text landed.
+    /// false means the pasteboard fallback ran and delivery is unconfirmed.
+    var onInjectionResult: ((Bool) -> Void)?
 
     private let audioEngine = AudioCaptureEngine()
     private var backend: (any TranscriptionBackend)?
@@ -396,7 +399,8 @@ final class TranscriptionCoordinator {
             self.cleanup()
             try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms for OS focus restore
             dbg("injecting: '\(finalText.prefix(80))'")
-            TextInjector.shared.inject(text: finalText)
+            let confirmed = TextInjector.shared.inject(text: finalText)
+            self.onInjectionResult?(confirmed)
         }
     }
 

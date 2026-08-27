@@ -63,7 +63,7 @@ final class OverlayWindow: NSPanel {
         hideWorkItem?.cancel()
         hideWorkItem = nil
         // Only reposition when not already visible — avoids jumping when
-        // show() is called again mid-session (e.g. flashInjected after recording).
+        // show() is called again mid-session.
         if self.alphaValue == 0 {
             reposition()
         }
@@ -82,10 +82,21 @@ final class OverlayWindow: NSPanel {
         scheduleHide(after: duration)
     }
 
+    /// Marks the transcript as delivered and hides the overlay immediately.
+    ///
+    /// Previously held the overlay for 1.5s to flash an "injected" confirmation.
+    /// That hold was the perceived lag on stop: the text lands in the target app
+    /// essentially instantly, so the overlay stayed on screen well after the user
+    /// could already see the result — reading as the app being slow rather than as
+    /// confirmation. The app itself is the confirmation.
+    ///
+    /// No hold replaces it: an AX-vs-pasteboard distinction tracks which API was
+    /// used, not whether delivery failed, and the fallback is the normal path in most
+    /// apps — so holding on it re-showed the overlay on nearly every dictation. Real
+    /// errors surface via showError(), which has its own display duration.
     func flashInjected() {
         viewModel.state = .injected
-        show()
-        scheduleHide(after: 1.5)
+        hide()
     }
 
     func hide() {
@@ -135,13 +146,18 @@ final class OverlayWindow: NSPanel {
     }
 
     private func fadeOut() {
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.25
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            self.animator().alphaValue = 0
-        }, completionHandler: {
-            self.orderOut(nil)
-        })
+        // Hides immediately — no fade.
+        //
+        // Previously a 0.25s eased alpha animation. On hotkey-stop with post-processing
+        // off, the transcript is injected almost instantly, so the overlay lingering
+        // through a quarter-second fade read as the app being slow to respond. Dropping
+        // the animation makes the stop feel instant.
+        //
+        // alphaValue is reset to 0 before orderOut (rather than relying on orderOut
+        // alone) so the next show() starts from a known state — show() checks
+        // `alphaValue == 0` to decide whether to animate in.
+        alphaValue = 0
+        orderOut(nil)
     }
 
     override var canBecomeKey: Bool { true }

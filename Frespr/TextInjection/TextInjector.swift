@@ -7,17 +7,26 @@ final class TextInjector {
     static let shared = TextInjector()
     private init() {}
 
-    func inject(text: String) {
-        guard !text.isEmpty else { return }
+    /// Injects `text` into the focused app.
+    ///
+    /// Returns true when the AX path succeeded — i.e. the text is definitively in
+    /// place. Returns false when it fell through to the pasteboard fallback, which
+    /// posts a synthetic Cmd+V asynchronously and cannot confirm the target actually
+    /// accepted it. Callers use this to decide whether to keep the overlay visible:
+    /// a confirmed injection needs no confirmation UI, an unconfirmed one does.
+    @discardableResult
+    func inject(text: String) -> Bool {
+        guard !text.isEmpty else { return false }
         let text = text.hasSuffix(" ") ? text : text + " "
         dbg("inject: '\(text.prefix(80))'")
 
         if tryAXInjection(text: text) {
             dbg("inject: AX succeeded")
-            return
+            return true
         }
         dbg("inject: AX failed, trying pasteboard fallback")
         pasteboardFallback(text: text)
+        return false
     }
 
     // MARK: - AXUIElement Injection

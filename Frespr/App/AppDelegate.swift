@@ -27,6 +27,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStateChange = { [weak self] state in self?.handleStateChange(state) }
         coordinator.onTranscriptUpdate = { [weak self] text, isFinal in self?.handleTranscriptUpdate(text: text, isFinal: isFinal) }
         coordinator.onError = { [weak self] msg in self?.showErrorToast(msg) }
+        // Deliberately does NOT re-show the overlay on an unconfirmed injection.
+        //
+        // An earlier attempt held the overlay for 1.5s whenever the AX path failed and
+        // the pasteboard fallback ran, on the theory that unconfirmed delivery deserves
+        // a visible transcript. In practice the fallback is the *normal* path for most
+        // apps (terminals, browsers, Electron editors), so the overlay reappeared on
+        // nearly every dictation — worse than the fixed delay it replaced. AX-vs-
+        // fallback tracks which API was used, not whether anything went wrong.
+        //
+        // Real failures surface through onError -> showErrorToast, which has its own
+        // 4s display. The result is kept wired for logging only.
+        coordinator.onInjectionResult = { confirmed in
+            dbg("injection confirmed=\(confirmed)")
+        }
 
         // 4. Hotkey
         let monitor = GlobalHotKeyMonitor()
