@@ -154,22 +154,40 @@ final class TextInjector {
         }
         pasteboard.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType"))
 
-        let changeCountAfterWrite = pasteboard.changeCount
+        // When `copyToClipboard` is enabled the coordinator has already put the
+        // final transcript on the pasteboard deliberately (see
+        // TranscriptionCoordinator.deliverTranscript). Restoring `previousContents`
+        // afterwards would silently undo that setting, so skip the restore and
+        // leave the transcript on the clipboard — which is what the user asked for.
+        let shouldRestoreClipboard = !AppSettings.shared.copyToClipboard
 
         // Give the pasteboard a tick to become globally visible before posting Cmd+V.
         // Without this, some apps (Terminal, sandboxed apps) read stale pasteboard
         // contents and the synthetic paste no-ops.
+        //
+        // The restore is nested inside this closure rather than scheduled next to it.
+        // Scheduling both from here measures the restore delay from the pasteboard
+        // write, leaving the paste only (0.5 - 0.05) = 450ms to complete; slow targets
+        // (Electron apps — VS Code, Slack) can miss that window and paste the
+        // *restored* previous contents instead of the transcript. Chaining keeps a
+        // full 500ms measured from the paste itself.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             simulateCmdV()
-        }
 
-        // Restore clipboard after paste completes; only if no other app has
-        // written to the pasteboard since us (prevents clobbering a user paste).
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            guard pasteboard.changeCount == changeCountAfterWrite else { return }
-            pasteboard.clearContents()
-            if let prev = previousContents {
-                pasteboard.setString(prev, forType: .string)
+            guard shouldRestoreClipboard else { return }
+
+            // Snapshot changeCount after our own write settles, so the guard below
+            // only skips the restore when a *different* app wrote in the meantime.
+            let changeCountAfterWrite = pasteboard.changeCount
+
+            // Restore clipboard after paste completes; only if no other app has
+            // written to the pasteboard since us (prevents clobbering a user paste).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard pasteboard.changeCount == changeCountAfterWrite else { return }
+                pasteboard.clearContents()
+                if let prev = previousContents {
+                    pasteboard.setString(prev, forType: .string)
+                }
             }
         }
     }
