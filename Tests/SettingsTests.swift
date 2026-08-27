@@ -168,6 +168,33 @@ private func runTests() {
         }
     }
 
+    suite("AppSettings orphaned-key cleanup") {
+        test("removes orphaned keys written by earlier versions") {
+            let d = UserDefaults.standard
+            // Simulate an install upgraded from a version that wrote these.
+            let orphans = ["hotKeyCode", "hotKeyLabel", "hotkeyMode", "injectionMode",
+                           "showOverlay", "silenceDetectionEnabled",
+                           "silenceTimeoutSeconds", "transcriptionLanguage",
+                           "transcriptionLanguageFavorites"]
+            for k in orphans { d.set("stale", forKey: k) }
+            // AppSettings.shared is already initialized, so invoke the cleanup the
+            // same way init() does rather than relying on singleton construction.
+            AppSettings.runOrphanCleanupForTesting()
+            for k in orphans {
+                expect(d.object(forKey: k) == nil, "orphaned key '\(k)' removed")
+            }
+        }
+        test("leaves live keys untouched") {
+            cleanDefaults()
+            AppSettings.shared.copyToClipboard = true
+            AppSettings.shared.hotKeyOption = .fn
+            AppSettings.runOrphanCleanupForTesting()
+            expect(AppSettings.shared.copyToClipboard, "copyToClipboard survives cleanup")
+            expectEqual(AppSettings.shared.hotKeyOption, .fn, "hotKeyOption survives cleanup")
+            cleanDefaults()
+        }
+    }
+
     suite("AppSettings.keyterms") {
         test("registered default is empty") {
             cleanDefaults()

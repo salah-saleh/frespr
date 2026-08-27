@@ -145,6 +145,51 @@ final class AppSettings {
             KeychainHelper.write(legacy, account: "geminiAPIKey")
             defaults.removeObject(forKey: Keys.geminiAPIKey)
         }
+        Self.removeOrphanedKeys(from: defaults)
+    }
+
+    /// Deletes UserDefaults keys written by earlier versions that no code reads.
+    ///
+    /// These accumulate when a feature is removed but its stored values are left
+    /// behind. They are not harmless: a stale key that looks meaningful actively
+    /// misleads. `hotKeyOption` was "fn" while the orphaned `hotKeyLabel` still said
+    /// "Right ⌥" and `hotKeyCode` said 61, which reads as corrupted state when
+    /// inspecting defaults — the label and code were simply dead. Likewise
+    /// `showOverlay` was 0 while the overlay always displayed, because nothing read
+    /// the key.
+    ///
+    /// Every name here was verified absent from the source before removal. Runs on
+    /// every launch rather than behind a version flag: it is idempotent, costs a
+    /// handful of dictionary lookups, and so also cleans installs that skipped a
+    /// version. Deliberately does NOT touch keys still in use, or
+    /// `transcriptionLogEntries` (live history).
+    /// Test hook: runs the orphan cleanup against standard defaults. The singleton is
+    /// already constructed by the time tests run, so init() cannot be re-triggered.
+    static func runOrphanCleanupForTesting() {
+        removeOrphanedKeys(from: .standard)
+    }
+
+    private static func removeOrphanedKeys(from defaults: UserDefaults) {
+        let orphaned = [
+            // Superseded by hotKeyOption, which stores the enum raw value.
+            "hotKeyCode", "hotKeyLabel", "hotkeyMode",
+            // Injection strategy is decided at runtime by TextInjector (AX, then
+            // pasteboard fallback); never configurable.
+            "injectionMode",
+            // Overlay visibility was never wired to a setting.
+            "showOverlay",
+            // Silence auto-stop, removed: it calibrated its threshold from the first
+            // ~500ms after the hotkey, which captured speech rather than ambient
+            // noise, so it cut recording off mid-sentence.
+            "silenceDetectionEnabled", "silenceTimeoutSeconds",
+            // Transcription language picker; DeepgramService now sends
+            // language=multi unconditionally.
+            "transcriptionLanguage", "transcriptionLanguageFavorites",
+        ]
+        let present = orphaned.filter { defaults.object(forKey: $0) != nil }
+        guard !present.isEmpty else { return }
+        for key in present { defaults.removeObject(forKey: key) }
+        dbg("AppSettings: removed \(present.count) orphaned defaults key(s): \(present.joined(separator: ", "))")
     }
 
     private enum Keys {
