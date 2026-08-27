@@ -91,7 +91,10 @@ Frespr/
 - **Transcript accumulation** — Deepgram delivers multiple `is_final=true` segments during recording; `accumulatedTranscript` joins them; all delivered before `onDisconnected`
 - **Hotkey toggle mode** — `onKeyDown` → `handleHotkeyPress()`; `onKeyUp` ignored. `pendingStop` flag defers stop if key released during `.connecting`. CGEventTap auto-re-enabled via raw type values `0xFFFFFFFE`/`0xFFFFFFFF` to survive macOS disabling it.
 - **isDelivering guard** — prevents double-delivery; `onDisconnected` skips cleanup if `isDelivering=true` (post-processing in flight)
-- **Silence detection** — auto-calibrates threshold during `.connecting` phase (5 ambient chunks → baseline × 2.5, floor 0.003); active during `.recording` only
+- **No silence auto-stop** — removed in 2.1.0. It calibrated its threshold from the first ~500ms after the hotkey, which captured speech rather than ambient noise, so the threshold landed above the user's voice and cut recording off mid-sentence. The hotkey is a toggle, so start/stop is user-controlled. `AudioCaptureEngine.onAudioLevel` remains available but has no observer.
+- **Keyterm prompting** — `AppSettings.keyterms` (comma-separated as typed) / `keytermList` (parsed); `DeepgramService` appends one repeated `keyterm=` param per term, bounded by both Deepgram's 100-term and 500-token caps since exceeding either fails the whole request
+- **Overlay hides immediately after injection** — no success-confirmation hold; the text appearing in the target app is the confirmation. Do NOT gate a hold on AX-vs-pasteboard: the fallback is the normal path in most apps, so it fires on nearly every dictation
+- **Orphaned defaults cleanup** — `AppSettings.removeOrphanedKeys` deletes keys from removed features on every launch; idempotent. Add to that list when removing a setting
 - **Post-processing** — `postProcess()` uses `userMessagePrefix` param: "Reformat" for cleanup/summarize, "Process" for custom so the system prompt is the sole directive
 - **Post-processing callback race** — `onTranscriptUpdate` called synchronously from `@MainActor`; do NOT re-wrap in `Task { @MainActor }` or `stopRecording()` races against `accumulatedTranscript`
 

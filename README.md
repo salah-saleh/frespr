@@ -13,7 +13,7 @@ Native macOS menu bar app for voice-to-text dictation powered by Deepgram Nova-3
 - **Post-processing** — optionally clean up filler words, summarize, or apply a custom prompt via Gemini
 - **Translation** — translate transcriptions before injecting, with quick-switch language favorites
 - **Configurable hotkey** — Right ⌥, Left ⌥, Fn/Globe, Right ⌘, or Ctrl+Option
-- **Silence detection** — auto-stops recording after configurable silence timeout
+- **Key terms** — boost recognition of names, product names, and jargon
 - **Transcription history** — last 20 transcriptions accessible from the menu bar
 - **Copy to clipboard** — optionally copies every transcription to the pasteboard
 - **Smart text injection** — uses Accessibility API (AXUIElement) with pasteboard+Cmd+V fallback
