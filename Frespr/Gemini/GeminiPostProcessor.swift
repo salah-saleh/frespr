@@ -39,9 +39,19 @@ private struct GenerateResponse: Decodable {
 @MainActor
 final class GeminiPostProcessor {
 
-    // gemini-2.5-flash: replaces deprecated gemini-2.0-flash (shutdown June 1 2026).
+    // Model history:
+    //   gemini-2.0-flash  → deprecated (shutdown June 1 2026)
+    //   gemini-2.5-flash  → deprecated 2026; reported shutdown between June 17 and Oct 16 2026
+    //   gemini-flash-latest → current (switched 2026-08-27)
+    //
+    // Considered pinning an explicit version (gemini-3.5-flash / gemini-3.7-flash) instead.
+    // Chose the `-latest` alias because this call site is a single non-critical
+    // post-processing step: on any failure the caller falls back to the raw transcript
+    // (see `postProcess` callers in TranscriptionCoordinator), so a silent model shift is
+    // low-risk here — and it avoids a third forced migration when this version is retired.
+    // If output quality ever drifts noticeably, pin an explicit version here instead.
     private static let endpoint =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
 
     /// Apply `systemPrompt` to `rawText` and return the model's response.
     /// Throws on network error, non-200 response, or empty result.

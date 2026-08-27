@@ -28,3 +28,4 @@ DerivedData/
 
 # Environment variables
 .env*
+.gstack/
