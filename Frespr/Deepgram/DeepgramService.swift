@@ -81,9 +81,27 @@ final class DeepgramService: NSObject, TranscriptionBackend {
         // treats commas/semicolons inside a single value as literal text, so they
         // must be split client-side. URLComponents percent-encodes spaces in
         // multi-word phrases. Supported on Nova-3 including language=multi.
-        // Deepgram caps this at 100 terms / 500 tokens; sending more errors the
-        // request, so the list is truncated rather than risking a failed connection.
-        let terms = AppSettings.shared.keytermList.prefix(100)
+        // Deepgram caps this at 100 terms AND 500 tokens; exceeding either errors the
+        // request, which would fail the whole connection and lose the transcript — so
+        // both are bounded client-side rather than trusted to the user's input.
+        //
+        // The 100-term cap alone is not sufficient: 100 multi-word phrases can exceed
+        // 500 tokens. Tokens are approximated as whitespace-separated words with a 1.3x
+        // allowance for sub-word splitting, and terms are accumulated until the budget
+        // is spent. Approximate on purpose — the exact tokenizer is not public, so this
+        // errs on the side of dropping a term rather than failing the request.
+        var terms: [String] = []
+        var tokenBudget = 500.0
+        for term in AppSettings.shared.keytermList.prefix(100) {
+            let cost = Double(term.split(separator: " ").count) * 1.3
+            guard tokenBudget - cost >= 0 else { break }
+            tokenBudget -= cost
+            terms.append(term)
+        }
+        let dropped = AppSettings.shared.keytermList.count - terms.count
+        if dropped > 0 {
+            dbg("[Deepgram] keyterms: dropped \(dropped) term(s) over Deepgram's 100-term / 500-token cap")
+        }
         if !terms.isEmpty {
             components.queryItems?.append(contentsOf: terms.map {
                 URLQueryItem(name: "keyterm", value: $0)

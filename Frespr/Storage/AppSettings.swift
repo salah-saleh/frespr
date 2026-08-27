@@ -221,7 +221,17 @@ protocol SecretStore {
 /// Keychain-backed default; `SettingsTests` swaps in `InMemorySecretStore`
 /// before touching any key property.
 enum SecretStorage {
-    static var current: SecretStore = KeychainSecretStore()
+    // nonisolated(unsafe): mutable global state, which Swift 6 strict concurrency
+    // flags as non-Sendable. Tried @MainActor first — it cascades 10 errors, because
+    // AppSettings itself is not main-actor isolated and its key properties are read
+    // from nonisolated contexts.
+    //
+    // Safe in practice: this is written exactly twice — once at init to the Keychain
+    // implementation, and once per test in cleanKeychain() — never concurrently with
+    // a read. It matches the existing isolation posture of AppSettings.shared, which
+    // is flagged the same way. build.sh does not enable strict concurrency, so this
+    // is pre-emptive; revisit if AppSettings itself becomes actor-isolated.
+    nonisolated(unsafe) static var current: SecretStore = KeychainSecretStore()
 }
 
 /// Non-persistent SecretStore for tests. Never touches the Keychain.
