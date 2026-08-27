@@ -89,6 +89,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let ppSummarizeRadio = NSButton(radioButtonWithTitle: PostProcessingMode.summarize.displayName, target: nil, action: nil)
     private let ppCustomRadio    = NSButton(radioButtonWithTitle: PostProcessingMode.custom.displayName,    target: nil, action: nil)
     private let ppCustomField    = NSTextField()
+    private let keytermField     = NSTextField()
 
     // Hotkey
     private let hotKeyPopup      = NSPopUpButton()
@@ -291,6 +292,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         inputInner.addArrangedSubview(hotkeyNote)
 
         inputInner.addArrangedSubview(cardSeparator())
+
+        // Keyterms row — comma-separated terms sent to Deepgram as keyterm params.
+        // Uses controlTextDidChange (via delegate) for live saving rather than .action,
+        // which only fires on Return — same reason ppCustomField does.
+        let keytermLabel = makeRowLabel("Key terms")
+        keytermField.placeholderString = "names, product names, jargon"
+        keytermField.font = .systemFont(ofSize: 12)
+        keytermField.bezelStyle = .roundedBezel
+        keytermField.target = self
+        keytermField.action = #selector(keytermsChanged)
+        keytermField.delegate = self
+
+        let keytermRow = NSStackView(views: [keytermLabel, keytermField])
+        keytermRow.orientation = .horizontal
+        keytermRow.spacing = 8
+        keytermLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        keytermField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        inputInner.addArrangedSubview(keytermRow)
+
+        inputInner.addArrangedSubview(makeNote("Boosts recognition of names, jargon, and product names. Separate with commas. Max 100 terms."))
 
 
         let inputContainer = padded(inputCard, top: 0, bottom: 0)
@@ -612,6 +633,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         ppCustomField.stringValue = s.customPostProcessingPrompt
         updatePPCustomFieldVisibility()
 
+        keytermField.stringValue = s.keyterms
+
         // Hotkey
         if let idx = HotKeyOption.allCases.firstIndex(of: s.hotKeyOption) {
             hotKeyPopup.selectItem(at: idx)
@@ -826,6 +849,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === ppCustomField {
             AppSettings.shared.customPostProcessingPrompt = ppCustomField.stringValue
+        } else if (obj.object as? NSTextField) === keytermField {
+            AppSettings.shared.keyterms = keytermField.stringValue
         }
     }
 
@@ -840,6 +865,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         updatePPRadios(mode: mode)
         AppSettings.shared.postProcessingMode = mode
         updatePPCustomFieldVisibility()
+    }
+
+    @objc private func keytermsChanged() {
+        AppSettings.shared.keyterms = keytermField.stringValue
     }
 
     @objc private func ppCustomPromptChanged() {

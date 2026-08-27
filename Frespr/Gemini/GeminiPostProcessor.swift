@@ -15,6 +15,17 @@ private struct GenerateRequest: Encodable {
     struct GenerationConfig: Encodable {
         let temperature: Double
         let candidateCount: Int
+
+        // Do NOT add a thinking/reasoning field here without testing it against this
+        // exact endpoint first. An attempt to cut latency with `thinking_level: "low"`
+        // was reverted — this v1beta generateContent endpoint rejects it:
+        //   HTTP 400 INVALID_ARGUMENT
+        //   Unknown name "thinking_level" at 'generation_config': Cannot find field.
+        // That field belongs to the OpenAI-compatibility layer, not native v1beta.
+        //
+        // The failure is quiet: process() throws, the caller injects the raw
+        // transcript, so cleanup silently stops while everything still looks fine.
+        // Only the HTTP 400 in /tmp/frespr_debug.log reveals it.
     }
     let systemInstruction: SystemInstruction
     let contents: [Content]

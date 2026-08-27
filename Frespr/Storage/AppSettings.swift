@@ -37,6 +37,23 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Keys.customPostProcessingPrompt) }
     }
 
+    /// Comma-separated terms sent to Deepgram as `keyterm` params to boost
+    /// recognition of names, jargon, and product names. Stored as typed; split
+    /// and URL-encoded at request time by DeepgramService.
+    var keyterms: String {
+        get { defaults.string(forKey: Keys.keyterms) ?? "" }
+        set { defaults.set(newValue, forKey: Keys.keyterms) }
+    }
+
+    /// `keyterms` parsed into individual terms: split on commas, trimmed, empties
+    /// dropped. Deepgram caps this at 100 terms / 500 tokens per request.
+    var keytermList: [String] {
+        keyterms
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     var copyToClipboard: Bool {
         get { defaults.bool(forKey: Keys.copyToClipboard) }
         set { defaults.set(newValue, forKey: Keys.copyToClipboard) }
@@ -115,6 +132,7 @@ final class AppSettings {
     private init() {
         defaults.register(defaults: [
             Keys.copyToClipboard: false,
+            Keys.keyterms: "",
             Keys.hotKeyOption: HotKeyOption.rightOption.rawValue,
             Keys.postProcessingMode: PostProcessingMode.cleanup.rawValue,
             Keys.soundFeedbackEnabled: true,
@@ -134,6 +152,7 @@ final class AppSettings {
         static let postProcessingMode        = "postProcessingMode"
         static let customPostProcessingPrompt = "customPostProcessingPrompt"
         static let copyToClipboard           = "copyToClipboard"
+        static let keyterms                  = "keyterms"
         static let hotKeyOption              = "hotKeyOption"
         static let translationEnabled        = "translationEnabled"
         static let translationSourceLanguage = "translationSourceLanguage"

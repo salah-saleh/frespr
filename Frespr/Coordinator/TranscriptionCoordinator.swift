@@ -414,6 +414,11 @@ final class TranscriptionCoordinator {
         // use systemInstruction as normal.
         do {
             dbg("postProcess mode=\(mode.rawValue)")
+            // Wall-clock timing so post-processing latency is visible in the log.
+            // Added when thinking_level was introduced — a silent fallback to the raw
+            // transcript looks identical to a successful no-op, so the elapsed time is
+            // the only way to confirm the request actually got faster.
+            let ppStart = Date()
             let result: String
             switch mode {
             case .none:
@@ -438,7 +443,7 @@ final class TranscriptionCoordinator {
                     inlineInstruction: custom
                 )
             }
-            dbg("postProcess done: '\(result.prefix(80))'")
+            dbg("postProcess done in \(String(format: "%.2f", Date().timeIntervalSince(ppStart)))s: '\(result.prefix(80))'")
             return result
         } catch {
             dbg("postProcess error (using raw): \(error)")

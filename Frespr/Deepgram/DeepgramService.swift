@@ -75,6 +75,22 @@ final class DeepgramService: NSObject, TranscriptionBackend {
             // Restores the multilingual capability that Gemini Live provided natively.
             URLQueryItem(name: "language", value: "multi"),
         ]
+
+        // keyterm: biases recognition toward user-supplied terms (names, jargon,
+        // product names). Passed as one repeated `keyterm` param per term — Deepgram
+        // treats commas/semicolons inside a single value as literal text, so they
+        // must be split client-side. URLComponents percent-encodes spaces in
+        // multi-word phrases. Supported on Nova-3 including language=multi.
+        // Deepgram caps this at 100 terms / 500 tokens; sending more errors the
+        // request, so the list is truncated rather than risking a failed connection.
+        let terms = AppSettings.shared.keytermList.prefix(100)
+        if !terms.isEmpty {
+            components.queryItems?.append(contentsOf: terms.map {
+                URLQueryItem(name: "keyterm", value: $0)
+            })
+            dbg("[Deepgram] keyterms: \(terms.count) term(s)")
+        }
+
         guard let url = components.url else {
             throw DeepgramError.connectionFailed("Failed to build Deepgram URL")
         }

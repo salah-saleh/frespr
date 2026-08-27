@@ -76,7 +76,7 @@ private func expectEqual<T: Equatable>(_ a: T, _ b: T, _ msg: String,
 
 private let settingsKeys = [
     "postProcessingMode", "customPostProcessingPrompt",
-    "copyToClipboard",
+    "copyToClipboard", "keyterms",
     "hotKeyOption", "translationEnabled", "translationSourceLanguage", "translationTargetLanguage"
 ]
 
@@ -165,6 +165,36 @@ private func runTests() {
             cleanDefaults()
             AppSettings.shared.copyToClipboard = false
             expect(!AppSettings.shared.copyToClipboard, "persists false")
+        }
+    }
+
+    suite("AppSettings.keyterms") {
+        test("registered default is empty") {
+            cleanDefaults()
+            expectEqual(AppSettings.shared.keyterms, "", "registered default is empty")
+        }
+        test("read/write round-trip") {
+            cleanDefaults()
+            AppSettings.shared.keyterms = "Acme, Deepgram"
+            expectEqual(AppSettings.shared.keyterms, "Acme, Deepgram", "persists raw string")
+        }
+        test("keytermList splits, trims, drops empties") {
+            cleanDefaults()
+            AppSettings.shared.keyterms = "  Acme ,Deepgram,  , Solid Queue ,"
+            expectEqual(AppSettings.shared.keytermList,
+                        ["Acme", "Deepgram", "Solid Queue"],
+                        "splits on commas, trims whitespace, drops empty entries")
+        }
+        test("keytermList empty for empty setting") {
+            cleanDefaults()
+            AppSettings.shared.keyterms = ""
+            expectEqual(AppSettings.shared.keytermList.count, 0, "no terms when unset")
+        }
+        test("keytermList preserves multi-word phrases") {
+            cleanDefaults()
+            AppSettings.shared.keyterms = "Solid Queue, Nova-3"
+            expectEqual(AppSettings.shared.keytermList, ["Solid Queue", "Nova-3"],
+                        "spaces inside a term are kept; only commas split")
         }
     }
 
